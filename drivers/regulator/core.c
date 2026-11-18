@@ -6211,6 +6211,15 @@ static int __init regulator_init(void)
 /* init early to allow our consumers to complete system booting */
 core_initcall(regulator_init);
 
+static bool regulator_ignore_unused;
+
+static int __init regulator_ignore_unused_setup(char *__unused)
+{
+	regulator_ignore_unused = true;
+	return 1;
+}
+__setup("regulator_ignore_unused", regulator_ignore_unused_setup);
+
 static int regulator_late_cleanup(struct device *dev, void *data)
 {
 	struct regulator_dev *rdev = dev_to_rdev(dev);
@@ -6231,6 +6240,11 @@ static int regulator_late_cleanup(struct device *dev, void *data)
 	/* If reading the status failed, assume that it's off. */
 	if (_regulator_is_enabled(rdev) <= 0)
 		goto unlock;
+
+	if (regulator_ignore_unused) {
+		rdev_info(rdev, "ignoring unused disable\n");
+		goto unlock;
+	}
 
 	if (have_full_constraints()) {
 		/* We log since this may kill the system if it goes

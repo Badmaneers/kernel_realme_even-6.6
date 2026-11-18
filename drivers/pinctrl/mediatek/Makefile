@@ -37,3 +37,8 @@ obj-$(CONFIG_PINCTRL_MT8195)		+= pinctrl-mt8195.o
 obj-$(CONFIG_PINCTRL_MT8365)		+= pinctrl-mt8365.o
 obj-$(CONFIG_PINCTRL_MT8516)		+= pinctrl-mt8516.o
 obj-$(CONFIG_PINCTRL_MT6397)		+= pinctrl-mt6397.o
+
+# MediaTek / Oplus built-in device drivers
+ifeq ($(CONFIG_DEVICE_MODULES_ALLOW_BUILTIN),y)
+include $(src)/Makefile.mtk
+endif

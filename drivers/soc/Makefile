@@ -35,3 +35,6 @@ obj-y				+= ti/
 obj-$(CONFIG_ARCH_U8500)	+= ux500/
 obj-$(CONFIG_PLAT_VERSATILE)	+= versatile/
 obj-y				+= xilinx/
+
+# MediaTek / Oplus in-tree integration
+obj-$(CONFIG_DEVICE_MODULES_ALLOW_BUILTIN) += oplus/
