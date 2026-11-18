@@ -1,0 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0
+
+ifneq ($(CONFIG_TRUSTONIC_TEE_SUPPORT),)
+	obj-$(CONFIG_TRUSTONIC_TEE_SUPPORT) += $(subst ",,$(CONFIG_TRUSTONIC_TEE_VERSION))/
+endif
