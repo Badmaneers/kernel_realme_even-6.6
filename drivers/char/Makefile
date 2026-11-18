@@ -44,3 +44,8 @@ obj-$(CONFIG_PS3_FLASH)		+= ps3flash.o
 obj-$(CONFIG_XILLYBUS_CLASS)	+= xillybus/
 obj-$(CONFIG_POWERNV_OP_PANEL)	+= powernv-op-panel.o
 obj-$(CONFIG_ADI)		+= adi.o
+
+# MediaTek / Oplus built-in device drivers
+ifeq ($(CONFIG_DEVICE_MODULES_ALLOW_BUILTIN),y)
+include $(src)/Makefile.mtk
+endif

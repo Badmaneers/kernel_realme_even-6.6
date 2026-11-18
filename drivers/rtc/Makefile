@@ -184,3 +184,8 @@ obj-$(CONFIG_RTC_DRV_WM8350)	+= rtc-wm8350.o
 obj-$(CONFIG_RTC_DRV_X1205)	+= rtc-x1205.o
 obj-$(CONFIG_RTC_DRV_XGENE)	+= rtc-xgene.o
 obj-$(CONFIG_RTC_DRV_ZYNQMP)	+= rtc-zynqmp.o
+
+# MediaTek / Oplus built-in device drivers
+ifeq ($(CONFIG_DEVICE_MODULES_ALLOW_BUILTIN),y)
+include $(src)/Makefile.mtk
+endif
