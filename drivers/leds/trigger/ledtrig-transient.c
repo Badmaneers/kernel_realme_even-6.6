@@ -73,9 +73,8 @@ static ssize_t transient_activate_store(struct device *dev,
 		return size;
 	}
 
-	/* start timer if there is no active timer */
-	if (state == 1 && transient_data->activate == 0 &&
-	    transient_data->duration != 0) {
+	/* start or reschedule timer */
+	if (state == 1 && transient_data->duration != 0) {
 		transient_data->activate = state;
 		led_set_brightness_nosleep(led_cdev, transient_data->state);
 		transient_data->restore_state =
@@ -170,6 +169,10 @@ static int transient_trig_activate(struct led_classdev *led_cdev)
 
 	led_set_trigger_data(led_cdev, tdata);
 	tdata->led_cdev = led_cdev;
+	if (led_cdev->name && !strcmp(led_cdev->name, "vibrator")) {
+		tdata->state = LED_FULL;
+		tdata->restore_state = LED_OFF;
+	}
 
 	timer_setup(&tdata->timer, transient_timer_function, 0);
 

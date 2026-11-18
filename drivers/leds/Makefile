@@ -112,3 +112,8 @@ obj-y					+= blink/
 
 # Simple LED drivers
 obj-y					+= simple/
+
+# MediaTek / Oplus built-in device drivers
+ifeq ($(CONFIG_DEVICE_MODULES_ALLOW_BUILTIN),y)
+include $(src)/Makefile.mtk
+endif
