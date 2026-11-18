@@ -38,3 +38,8 @@ obj-y += analogix/
 obj-y += cadence/
 obj-y += imx/
 obj-y += synopsys/
+
+# MediaTek / Oplus built-in device drivers
+ifeq ($(CONFIG_DEVICE_MODULES_ALLOW_BUILTIN),y)
+include $(src)/Makefile.mtk
+endif

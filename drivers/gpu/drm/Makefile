@@ -198,3 +198,6 @@ obj-$(CONFIG_DRM_HYPERV) += hyperv/
 obj-y			+= solomon/
 obj-$(CONFIG_DRM_SPRD) += sprd/
 obj-$(CONFIG_DRM_LOONGSON) += loongson/
+
+# MediaTek / Oplus in-tree integration
+obj-$(CONFIG_DEVICE_MODULES_DRM_MEDIATEK) += mediatek/

@@ -27,3 +27,8 @@ mediatek-drm-hdmi-objs := mtk_cec.o \
 obj-$(CONFIG_DRM_MEDIATEK_HDMI) += mediatek-drm-hdmi.o
 
 obj-$(CONFIG_DRM_MEDIATEK_DP) += mtk_dp.o
+
+# MediaTek / Oplus built-in device drivers
+ifeq ($(CONFIG_DEVICE_MODULES_ALLOW_BUILTIN),y)
+include $(src)/Makefile.mtk
+endif

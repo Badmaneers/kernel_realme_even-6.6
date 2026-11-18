@@ -5,3 +5,8 @@
 obj-y			+= host1x/ drm/ vga/
 obj-$(CONFIG_IMX_IPUV3_CORE)	+= ipu-v3/
 obj-$(CONFIG_TRACE_GPU_MEM)		+= trace/
+
+# MediaTek / Oplus built-in device drivers
+ifeq ($(CONFIG_DEVICE_MODULES_ALLOW_BUILTIN),y)
+include $(src)/Makefile.mtk
+endif
