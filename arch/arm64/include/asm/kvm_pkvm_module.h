@@ -325,6 +325,7 @@ static inline int pkvm_register_el2_mod_call(dyn_hcall_t hfn,
 {
 	return __pkvm_register_el2_call(pkvm_el2_mod_va(hfn, token));
 }
+#endif
 
 #define pkvm_el2_mod_call(id, ...)					\
 	({								\
@@ -347,5 +348,4 @@ static inline int pkvm_register_el2_mod_call(dyn_hcall_t hfn,
 									\
 		res;							\
 	})
-#endif
 #endif

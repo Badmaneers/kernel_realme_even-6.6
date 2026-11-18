@@ -1,0 +1,242 @@
+# SPDX-License-Identifier: GPL-2.0
+
+config DEVICE_MODULES_ALLOW_BUILTIN
+	bool "allow builtin drivers into kernel image"
+	help
+	  All modules are default built as kernel modules.
+	  Set DEVICE_MODULES_ALLOW_BUILTIN=y to build modules
+	  into the kernel image.
+	  If unsure, say N.
+
+source "drivers/memory/Kconfig.mtk"
+
+source "drivers/iio/adc/Kconfig.mtk"
+
+source "drivers/mfd/Kconfig.mtk"
+
+source "drivers/nvmem/Kconfig.mtk"
+
+source "drivers/dma/mediatek/Kconfig.mtk"
+
+source "drivers/ufs/Kconfig.mtk"
+
+source "drivers/char/Kconfig.mtk"
+
+source "drivers/clk/mediatek/Kconfig.mtk"
+
+source "drivers/clocksource/Kconfig.mtk"
+
+source "drivers/cpufreq/Kconfig.mtk"
+
+source "drivers/soc/mediatek/Kconfig.mtk"
+
+source "drivers/watchdog/Kconfig.mtk"
+
+source "drivers/dma-buf/heaps/Kconfig.mtk"
+
+source "drivers/regulator/Kconfig.mtk"
+
+source "drivers/leds/Kconfig.mtk"
+
+source "drivers/pinctrl/mediatek/Kconfig.mtk"
+
+source "drivers/power/supply/Kconfig.mtk"
+
+source "drivers/power/Kconfig.mtk"
+
+source "drivers/rtc/Kconfig.mtk"
+
+source "drivers/remoteproc/Kconfig.mtk"
+
+source "drivers/rpmsg/Kconfig.mtk"
+
+source "drivers/input/keyboard/Kconfig.mtk"
+
+source "drivers/phy/mediatek/Kconfig.mtk"
+
+source "drivers/thermal/mediatek/Kconfig.mtk"
+
+source "drivers/spmi/Kconfig.mtk"
+
+source "drivers/tty/serial/8250/Kconfig.mtk"
+
+source "drivers/reset/Kconfig.mtk"
+
+source "drivers/mailbox/Kconfig.mtk"
+
+source "drivers/interconnect/Kconfig.mtk"
+
+source "drivers/i2c/busses/Kconfig.mtk"
+
+source "drivers/i3c/master/Kconfig.mtk"
+
+source "drivers/pwm/Kconfig.mtk"
+
+source "drivers/spi/Kconfig.mtk"
+
+source "drivers/iommu/Kconfig.mtk"
+
+source "drivers/tee/Kconfig.mtk"
+
+source "drivers/mmc/host/Kconfig.mtk"
+
+source "drivers/gpu/drm/mediatek/Kconfig.mtk"
+
+source "drivers/input/touchscreen/Kconfig.mtk"
+
+source "drivers/gpu/drm/panel/Kconfig.mtk"
+
+source "drivers/gpu/drm/bridge/Kconfig.mtk"
+
+source "drivers/gpu/mediatek/Kconfig"
+
+source "drivers/media/platform/Kconfig.mtk"
+
+source "drivers/usb/Kconfig.mtk"
+
+# pruned: # pruned: source "drivers/net/ethernet/stmicro/Kconfig"
+
+source "drivers/net/phy/Kconfig.mtk"
+
+source "drivers/devfreq/Kconfig.mtk"
+
+source "drivers/misc/mediatek/Kconfig"
+
+source "sound/soc/codecs/Kconfig.mtk"
+
+source "sound/soc/mediatek/Kconfig.mtk"
+
+# pruned: # pruned: source "sound/virtio/Kconfig"
+
+source "drivers/pci/controller/Kconfig.mtk"
+
+source "drivers/pinctrl/Kconfig.mtk"
+
+source "drivers/media/platform/mtk-isp/Kconfig"
+
+source "drivers/soc/oplus/oplus_mm_fb/Kconfig"
+
+source "drivers/soc/oplus/boot/Kconfig"
+
+source "drivers/soc/oplus/boot/oplus_projectinfo/Kconfig"
+
+source "drivers/soc/oplus/boot/cmdline_parser/Kconfig"
+
+source "drivers/soc/oplus/boot/oplus_custom/Kconfig"
+
+source "fs/f2fs/Kconfig.mtk"
+
+source "arch/arm/Kconfig.mtk"
+
+source "drivers/soc/oplus/device_info/Kconfig"
+
+source "drivers/soc/oplus/storage/common/ufs_oplus_dbg/Kconfig"
+
+source "drivers/base/kernelFwUpdate/Kconfig"
+
+source "drivers/misc/oplus/oplus_gpio/Kconfig"
+
+source "drivers/base/touchpanel_notify/Kconfig"
+
+source "drivers/misc/oplus/vibrator/aw8697_haptic/Kconfig"
+
+source "drivers/misc/oplus/sim_detect/Kconfig"
+
+source "drivers/input/fingerprint/Kconfig"
+
+source "drivers/hypervisor/guest/Kconfig"
+
+source "drivers/hypervisor/host/Kconfig"
+
+source "drivers/hypervisor/nebula/Kconfig"
+
+source "drivers/oplus_inject/Kconfig"
+
+source "drivers/misc/oplus/cs_press/Kconfig"
+
+source "drivers/soc/oplus/dft/common/olc/Kconfig"
+
+source "drivers/soc/oplus/dft/common/feedback/Kconfig"
+
+source "drivers/soc/oplus/storage/common/io_metrics/Kconfig"
+
+source "drivers/video/backlight/Kconfig.mtk"
+
+source "kernel/oplus_cpu/Kconfig"
+
+source "drivers/base/magtransfer/Kconfig"
+
+source "drivers/soc/oplus/storage/common/storage_log/Kconfig"
+
+source "drivers/soc/oplus/storage/common/oplus_uprobe/Kconfig"
+
+source "drivers/soc/oplus/storage/common/oplus_f2fslog_storage/Kconfig"
+
+source "drivers/soc/oplus/storage/common/wq_dynamic_priority/Kconfig"
+
+source "drivers/misc/mediatek/pmic_ldo_set/Kconfig"
+
+source "drivers/misc/mediatek/sensor/2.0/oplus_sensor_devinfo/Kconfig"
+
+source "drivers/misc/mediatek/sensor/2.0/oplus_consumer_ir/Kconfig"
+
+source "drivers/misc/mediatek/sensor/2.0/oplus_virtual_sensor/Kconfig"
+
+source "drivers/misc/mediatek/sensor/2.0/oplus_virtual_sensor/platform/sensor_cmd/Kconfig"
+
+source "drivers/misc/mediatek/sensor/2.0/oplus_virtual_sensor/platform/sensor_device/Kconfig"
+
+source "drivers/misc/mediatek/sensor/2.0/oplus_virtual_sensor/platform/sensor_event/Kconfig"
+
+source "drivers/misc/mediatek/sensor/2.0/oplus_virtual_sensor/sensors/lux_aodhub/Kconfig"
+
+source "drivers/misc/mediatek/sensor/2.0/oplus_virtual_sensor/sensors/fp_displayhub/Kconfig"
+
+source "drivers/misc/mediatek/sensor/2.0/oplus_virtual_sensor/sensors/pickup_detecthub/Kconfig"
+
+source "drivers/misc/mediatek/sensor/2.0/oplus_virtual_sensor/sensors/back_tap_detecthub/Kconfig"
+
+source "drivers/gpu/oplus_mali_interface/Kconfig"
+
+source "drivers/misc/mediatek/sensor/2.0/oplus_virtual_sensor/sensors/pedo_minutehub/Kconfig"
+source "drivers/misc/mediatek/aw37004/Kconfig"
+
+source "drivers/misc/mediatek/sensor/2.0/oplus_virtual_sensor/sensors/phone_proxhub/Kconfig"
+
+source "drivers/misc/mediatek/sensor/2.0/oplus_virtual_sensor/sensors/gesture_proxhub/Kconfig"
+
+source "drivers/misc/mediatek/sensor/2.0/oplus_virtual_sensor/sensors/ambiente_proxhub/Kconfig"
+
+source "drivers/misc/mediatek/sensor/2.0/oplus_virtual_sensor/sensors/lay_detecthub/Kconfig"
+
+source "drivers/misc/mediatek/sensor/2.0/oplus_virtual_sensor/sensors/palm_detecthub/Kconfig"
+
+source "drivers/misc/mediatek/sensor/2.0/oplus_virtual_sensor/sensors/oplus_activity_recognitionhub/Kconfig"
+
+source "drivers/misc/mediatek/sensor/2.0/oplus_virtual_sensor/sensors/elevator_detecthub/Kconfig"
+
+source "drivers/misc/mediatek/sensor/1.0/oplus_sensor_devinfo/Kconfig"
+
+source "drivers/misc/mediatek/sensor/1.0/oplus_virtual_sensor/Kconfig"
+
+source "drivers/misc/mediatek/sensor/1.0/oplus_virtual_sensor/platform/sensor_cmd/Kconfig"
+
+source "drivers/misc/mediatek/sensor/1.0/oplus_virtual_sensor/platform/sensor_device/Kconfig"
+
+source "drivers/misc/mediatek/sensor/1.0/oplus_virtual_sensor/platform/sensor_event/Kconfig"
+
+source "drivers/misc/mediatek/sensor/1.0/oplus_virtual_sensor/sensors/lux_aodhub/Kconfig"
+
+source "drivers/misc/mediatek/sensor/1.0/oplus_virtual_sensor/sensors/fp_displayhub/Kconfig"
+
+source "drivers/misc/mediatek/sensor/1.0/oplus_virtual_sensor/sensors/pickup_detecthub/Kconfig"
+
+source "drivers/misc/mediatek/sensor/1.0/oplus_virtual_sensor/sensors/palm_detecthub/Kconfig"
+
+source "drivers/misc/mediatek/sensor/1.0/oplus_virtual_sensor/sensors/back_tap_detecthub/Kconfig"
+
+source "drivers/misc/mediatek/sensor/2.0/oplus_virtual_sensor/sensors/back_tap_detecthub/Kconfig"
+
+source "drivers/misc/mediatek/sensor/2.0/oplus_virtual_sensor/sensors/rotation_detecthub/Kconfig"
+
+source "drivers/misc/mediatek/sensor/1.0/oplus_virtual_sensor/sensors/pedo_minutehub/Kconfig"

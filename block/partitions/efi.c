@@ -691,6 +691,35 @@ static void utf16_le_to_7bit(const __le16 *in, unsigned int size, u8 *out)
 	}
 }
 
+struct replace_partition_tbl {
+	const char *old_name;
+	const char *new_name;
+};
+
+static const struct replace_partition_tbl oplus_part_tbl[] = {
+	{"opporeserve1", "oplusreserve1"},
+	{"opporeserve2", "oplusreserve2"},
+	{"opporeserve3", "oplusreserve3"},
+	{"opporeserve4", "oplusreserve4"},
+	{"opporeserve5", "oplusreserve5"},
+	{"opporeserve6", "oplusreserve6"},
+	{"oppo_custom", "oplus_custom"},
+};
+
+static void oplus_replace_partition_name(char *name, size_t max_len)
+{
+	int part_idx;
+
+	for (part_idx = 0; part_idx < ARRAY_SIZE(oplus_part_tbl); part_idx++) {
+		if (!strcmp(name, oplus_part_tbl[part_idx].old_name)) {
+			pr_warn("rename partition name: %s->%s\n",
+				name, oplus_part_tbl[part_idx].new_name);
+			strscpy(name, oplus_part_tbl[part_idx].new_name, max_len);
+			return;
+		}
+	}
+}
+
 /**
  * efi_partition - scan for GPT partitions
  * @state: disk parsed partitions
@@ -748,6 +777,7 @@ int efi_partition(struct parsed_partitions *state)
 		label_max = min(ARRAY_SIZE(info->volname) - 1,
 				ARRAY_SIZE(ptes[i].partition_name));
 		utf16_le_to_7bit(ptes[i].partition_name, label_max, info->volname);
+		oplus_replace_partition_name(info->volname, sizeof(info->volname));
 		state->parts[i + 1].has_info = true;
 	}
 	kfree(ptes);

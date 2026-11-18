@@ -169,3 +169,7 @@ sphinx_*/
 
 # Rust analyzer configuration
 /rust-project.json
+
+# Build outputs & local signing keys
+/out/
+certs/mtk_signing_key.pem

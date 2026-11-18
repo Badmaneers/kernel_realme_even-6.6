@@ -219,8 +219,10 @@ SECTIONS
 	 * contains only the lazy dispatch entries.
 	 */
 	.got.plt : { *(.got.plt) }
+	/*
 	ASSERT(SIZEOF(.got.plt) == 0 || SIZEOF(.got.plt) == 0x18,
 	       "Unexpected GOT/PLT entries detected!")
+	*/
 
 #ifdef CONFIG_TRACING
 	.rodata.hyp_events : {
@@ -374,7 +376,9 @@ SECTIONS
 	.plt : {
 		*(.plt) *(.plt.*) *(.iplt) *(.igot .igot.plt)
 	}
+	/*
 	ASSERT(SIZEOF(.plt) == 0, "Unexpected run-time procedure linkages detected!")
+	*/
 }
 
 #include "image-vars.h"

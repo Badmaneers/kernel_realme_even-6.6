@@ -34,3 +34,6 @@ ccflags-$(CONFIG_DEBUG_DRIVER) := -DDEBUG
 # define_trace.h needs to know how to find our header
 CFLAGS_trace.o		:= -I$(src)
 obj-$(CONFIG_TRACING)	+= trace.o
+
+# MediaTek / Oplus in-tree integration
+obj-$(CONFIG_DEVICE_MODULES_ALLOW_BUILTIN) += touchpanel_notify/

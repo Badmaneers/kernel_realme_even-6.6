@@ -570,7 +570,14 @@ LINUXINCLUDE    := \
 		-I$(objtree)/arch/$(SRCARCH)/include/generated \
 		$(if $(building_out_of_srctree),-I$(srctree)/include) \
 		-I$(objtree)/include \
-		$(USERINCLUDE)
+		$(USERINCLUDE) \
+		-I$(srctree)/drivers/gpu/drm/mediatek/mediatek_v2 \
+		-I$(srctree)/drivers/misc/mediatek/include \
+		-I$(srctree)/drivers/misc/mediatek/include/mt-plat \
+		-I$(srctree)/drivers/misc/mediatek/sensor/2.0/mtk_nanohub \
+		-I$(srctree)/drivers/misc/mediatek/sensor/2.0/mtk_nanohub/nanohub \
+		-I$(srctree)/drivers/misc/mediatek/sensor/2.0/core \
+		-I$(srctree)/drivers/misc/mediatek/sensor/2.0/sensorhub
 
 KBUILD_AFLAGS   := -D__ASSEMBLY__ -fno-PIE
 
@@ -581,6 +588,7 @@ KBUILD_CFLAGS += -funsigned-char
 KBUILD_CFLAGS += -fno-common
 KBUILD_CFLAGS += -fno-PIE
 KBUILD_CFLAGS += -fno-strict-aliasing
+KBUILD_CFLAGS += -Wno-macro-redefined
 
 KBUILD_CPPFLAGS := -D__KERNEL__
 KBUILD_RUSTFLAGS := $(rust_common_flags) \
@@ -628,6 +636,10 @@ export KBUILD_USERCFLAGS KBUILD_USERLDFLAGS
 
 export KBUILD_CPPFLAGS NOSTDINC_FLAGS LINUXINCLUDE OBJCOPYFLAGS KBUILD_LDFLAGS
 export KBUILD_CFLAGS CFLAGS_KERNEL CFLAGS_MODULE
+
+# MediaTek / Oplus in-tree path compatibility
+DEVICE_MODULES_PATH := $(srctree)
+export DEVICE_MODULES_PATH
 export KBUILD_RUSTFLAGS RUSTFLAGS_KERNEL RUSTFLAGS_MODULE
 export KBUILD_AFLAGS AFLAGS_KERNEL AFLAGS_MODULE
 export KBUILD_AFLAGS_MODULE KBUILD_CFLAGS_MODULE KBUILD_RUSTFLAGS_MODULE KBUILD_LDFLAGS_MODULE

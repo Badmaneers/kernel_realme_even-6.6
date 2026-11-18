@@ -199,3 +199,6 @@ obj-$(CONFIG_DRM_ACCEL)		+= accel/
 obj-$(CONFIG_CDX_BUS)		+= cdx/
 
 obj-$(CONFIG_S390)		+= s390/
+
+# MediaTek / Oplus in-tree integration
+obj-$(CONFIG_DEVICE_MODULES_ALLOW_BUILTIN) += tee/
