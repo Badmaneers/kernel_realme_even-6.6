@@ -1209,7 +1209,7 @@ aliases {
 
 	scp@10500000 {
 		compatible = "mediatek,scp";
-		status = "disabled";
+		status = "okay";
 		reg = <0 0x10500000 0 0x80000>,
 				<0 0x105c0000 0 0x3000>,
 				<0 0x105c4000 0 0x1000>,
@@ -1220,7 +1220,7 @@ aliases {
 		scp_mpuRegionId = <28>;
 		scp_feature_tbl = <0 5>,   /* vow */
 				<1 356>,  /* dsp */
-				<2 250>,   /* sensor */
+				<2 62>,   /* sensor */
 				<3 47>,   /* mp3 */
 				<4 26>,   /* flp */
 				<5 0>,    /* rtos */
