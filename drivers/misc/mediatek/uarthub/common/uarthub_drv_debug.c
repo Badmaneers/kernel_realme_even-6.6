@@ -64,7 +64,7 @@ static const UARTHUB_DBG_FUNC uarthub_dbg_func[] = {
 #endif /* UARTHUB_DBG_SUPPORT */
 };
 
-int osal_strtol(const char *str, unsigned int adecimal, long *res)
+static int osal_strtol(const char *str, unsigned int adecimal, long *res)
 {
 	if (sizeof(long) == 4)
 		return kstrtou32(str, adecimal, (unsigned int *) res);
