@@ -4929,6 +4929,28 @@ audio_extend: audio_extend {
 	flashlights_even: flashlights_even {
 		compatible = "mediatek,flashlights_even";
 		decouple = <1>;
+		pinctrl-names = "default",
+			"hwen_high",
+			"hwen_low",
+			"flash_light_en_pin_0",
+			"flash_light_en_pin_1",
+			"flash_light_flash_pin_0",
+			"flash_light_flash_pin_1",
+			"flash_light_pwm_pin",
+			"flash_light_temp_pin_0",
+			"flash_light_temp_pin_1";
+		pinctrl-0 = <&flashlights_even_pins_default>;
+		pinctrl-1 = <&flashlights_even_pins_hwen_high>;
+		pinctrl-2 = <&flashlights_even_pins_hwen_low>;
+		pinctrl-3 = <&flash_light_en_pin_0>;
+		pinctrl-4 = <&flash_light_en_pin_1>;
+		pinctrl-5 = <&flash_light_flash_pin_0>;
+		pinctrl-6 = <&flash_light_flash_pin_1>;
+		pinctrl-7 = <&flash_light_pwm_pin>;
+		pinctrl-8 = <&flash_light_temp_pin_0>;
+		pinctrl-9 = <&flash_light_temp_pin_1>;
+		status = "okay";
+
 		channel@1 {
 			type = <0>;
 			ct = <0>;

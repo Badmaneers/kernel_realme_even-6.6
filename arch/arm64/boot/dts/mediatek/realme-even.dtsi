@@ -33,6 +33,81 @@
 			bias-disable;
 		};
 	};
+
+	flashlights_even_pins_default: default {
+	};
+
+	flashlights_even_pins_hwen_high: hwen_high {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO152__FUNC_GPIO152>;
+			slew-rate = <1>;
+			output-high;
+		};
+	};
+
+	flashlights_even_pins_hwen_low: hwen_low {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO152__FUNC_GPIO152>;
+			slew-rate = <1>;
+			output-low;
+		};
+	};
+
+	flash_light_en_pin_0: flash_light_en_pin_0 {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO152__FUNC_GPIO152>;
+			slew-rate = <1>;
+			output-low;
+		};
+	};
+
+	flash_light_en_pin_1: flash_light_en_pin_1 {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO152__FUNC_GPIO152>;
+			slew-rate = <1>;
+			output-high;
+		};
+	};
+
+	flash_light_flash_pin_0: flash_light_flash_pin_0 {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO153__FUNC_GPIO153>;
+			slew-rate = <1>;
+			output-low;
+		};
+	};
+
+	flash_light_flash_pin_1: flash_light_flash_pin_1 {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO153__FUNC_GPIO153>;
+			slew-rate = <1>;
+			output-high;
+		};
+	};
+
+	flash_light_pwm_pin: flash_light_pwm_pin {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO153__FUNC_PWM0>;
+			slew-rate = <1>;
+			output-high;
+		};
+	};
+
+	flash_light_temp_pin_0: flash_light_temp_pin_0 {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO21__FUNC_GPIO21>;
+			slew-rate = <1>;
+			output-low;
+		};
+	};
+
+	flash_light_temp_pin_1: flash_light_temp_pin_1 {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO21__FUNC_GPIO21>;
+			slew-rate = <1>;
+			output-high;
+		};
+	};
 };
 
 &i2c0 {
