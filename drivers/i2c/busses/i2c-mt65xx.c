@@ -2666,9 +2666,12 @@ static int mtk_i2c_parse_dt(struct device_node *np, struct mtk_i2c *i2c)
 			i2c->i2c_offset_ap, i2c->i2c_offset_scp);
 
 	of_property_read_u32(np, "clk-src-in-hz", &i2c->clk_src_in_hz);
-	of_property_read_u32(np, "ch-offset-i2c", &i2c->ch_offset_i2c);
-	of_property_read_u32(np, "ch-offset-scp", &i2c->ch_offset_scp);
-	of_property_read_u32(np, "ch-offset-ccu", &i2c->ch_offset_ccu);
+	if (of_property_read_u32(np, "ch-offset-i2c", &i2c->ch_offset_i2c) < 0)
+		of_property_read_u32(np, "ch_offset_default", &i2c->ch_offset_i2c);
+	if (of_property_read_u32(np, "ch-offset-scp", &i2c->ch_offset_scp) < 0)
+		of_property_read_u32(np, "ch_offset_ccu", &i2c->ch_offset_scp);
+	if (of_property_read_u32(np, "ch-offset-ccu", &i2c->ch_offset_ccu) < 0)
+		of_property_read_u32(np, "ch_offset_ccu", &i2c->ch_offset_ccu);
 	of_property_read_u32(np, "ch-offset-dma", &i2c->ch_offset_dma);
 	i2c->ctrl_irq_sel = of_property_read_bool(np, "mediatek,control-irq-sel");
 	i2c->ctrl_rs_stop = of_property_read_bool(np, "mediatek,control-rs-stop");
