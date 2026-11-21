@@ -9,6 +9,8 @@ endif
 
 # Necessary Check
 
+CONNAC_VER ?= 1_0
+MODULE_NAME ?= wmt_chrdev_wifi
 $(info [wlan] CONNAC_VER=$(CONNAC_VER))
 $(info [wlan] MODULE_NAME=$(MODULE_NAME))
 
@@ -39,8 +41,8 @@ else ifeq ($(CONNAC_VER), 2_0)
     ccflags-y += -DCFG_SUPPORT_CONNAC2X=1
 else
     ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/include/mt-plat
-    ccflags-y += -I$(TOP)/vendor/mediatek/kernel_modules/connectivity/common/common_main/include
-    ccflags-y += -I$(TOP)/vendor/mediatek/kernel_modules/connectivity/common/common_main/linux/include
+    ccflags-y += -I$(srctree)/drivers/misc/mediatek/connectivity/wmt_drv/common_main/include
+    ccflags-y += -I$(srctree)/drivers/misc/mediatek/connectivity/wmt_drv/common_main/linux/include
     ccflags-y += -DCFG_ANDORID_CONNINFRA_SUPPORT=0
     ccflags-y += -DCFG_ANDORID_CONNINFRA_COREDUMP_SUPPORT=0
     ccflags-y += -DCFG_SUPPORT_CONNAC1X=1
@@ -48,7 +50,7 @@ endif
 
 ifeq ($(CONFIG_MTK_CONNSYS_DEDICATED_LOG_PATH), y)
     ccflags-y += -DCFG_MTK_CONNSYS_DEDICATED_LOG_PATH
-    ccflags-y += -I$(TOP)/vendor/mediatek/kernel_modules/connectivity/common/debug_utility
+    ccflags-y += -I$(srctree)/drivers/misc/mediatek/connectivity/wmt_drv/debug_utility
 endif
 
 ifeq ($(CONFIG_MTK_CONN_LTE_IDC_SUPPORT),y)
