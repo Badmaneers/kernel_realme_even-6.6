@@ -56,6 +56,15 @@ enum IMGSENSOR_RETURN imgsensor_hw_init(struct IMGSENSOR_HW *phw)
 
 	for (i = 0; i < IMGSENSOR_SENSOR_IDX_MAX_NUM; i++) {
 		psensor_pwr = &phw->sensor_pwr[i];
+#ifdef MIPI_SWITCH
+		for (j = 0; j < IMGSENSOR_HW_ID_MAX_NUM; j++) {
+			if (phw->pdev[j]->id == IMGSENSOR_HW_ID_GPIO) {
+				psensor_pwr->id[IMGSENSOR_HW_PIN_MIPI_SWITCH_EN] = j;
+				psensor_pwr->id[IMGSENSOR_HW_PIN_MIPI_SWITCH_SEL] = j;
+				break;
+			}
+		}
+#endif
 
 		while (pcust_pwr_cfg->sensor_idx != i &&
 		       pcust_pwr_cfg->sensor_idx != IMGSENSOR_SENSOR_IDX_NONE)
@@ -204,17 +213,20 @@ enum IMGSENSOR_RETURN imgsensor_hw_power(
 	struct IMGSENSOR_HW_POWER_SEQ *ppwr_seq = NULL;
 	#endif
 
+	const char *enable_list;
+
+	enable_list = phw->enable_sensor_by_index[(uint32_t)sensor_idx];
+	if (!enable_list && sensor_idx == IMGSENSOR_SENSOR_IDX_MAIN3)
+		enable_list = phw->enable_sensor_by_index[3];
+
 	pr_info(
 		"v1 sensor_idx %d, power %d curr_sensor_name %s, enable list %s\n",
 		sensor_idx,
 		pwr_status,
 		curr_sensor_name,
-		phw->enable_sensor_by_index[(uint32_t)sensor_idx] == NULL
-		? "NULL"
-		: phw->enable_sensor_by_index[(uint32_t)sensor_idx]);
+		enable_list == NULL ? "NULL" : enable_list);
 
-	if (phw->enable_sensor_by_index[(uint32_t)sensor_idx] &&
-	!strstr(phw->enable_sensor_by_index[(uint32_t)sensor_idx], curr_sensor_name))
+	if (enable_list && !strstr(enable_list, curr_sensor_name))
 		return IMGSENSOR_RETURN_ERROR;
 
 

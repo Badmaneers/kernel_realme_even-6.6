@@ -318,6 +318,10 @@ struct IMGSENSOR_HW_CFG imgsensor_custom_config_even[] = {
 			{IMGSENSOR_HW_ID_REGULATOR, IMGSENSOR_HW_PIN_DVDD},
 			{IMGSENSOR_HW_ID_GPIO, IMGSENSOR_HW_PIN_PDN},
 			{IMGSENSOR_HW_ID_GPIO, IMGSENSOR_HW_PIN_RST},
+#ifdef MIPI_SWITCH
+			{IMGSENSOR_HW_ID_GPIO, IMGSENSOR_HW_PIN_MIPI_SWITCH_EN},
+			{IMGSENSOR_HW_ID_GPIO, IMGSENSOR_HW_PIN_MIPI_SWITCH_SEL},
+#endif
 			{IMGSENSOR_HW_ID_NONE, IMGSENSOR_HW_PIN_NONE},
 		},
 	},
@@ -330,6 +334,10 @@ struct IMGSENSOR_HW_CFG imgsensor_custom_config_even[] = {
 			{IMGSENSOR_HW_ID_REGULATOR, IMGSENSOR_HW_PIN_DOVDD},
 			{IMGSENSOR_HW_ID_REGULATOR, IMGSENSOR_HW_PIN_DVDD},
 			{IMGSENSOR_HW_ID_GPIO, IMGSENSOR_HW_PIN_RST},
+#ifdef MIPI_SWITCH
+			{IMGSENSOR_HW_ID_GPIO, IMGSENSOR_HW_PIN_MIPI_SWITCH_EN},
+			{IMGSENSOR_HW_ID_GPIO, IMGSENSOR_HW_PIN_MIPI_SWITCH_SEL},
+#endif
 			{IMGSENSOR_HW_ID_NONE, IMGSENSOR_HW_PIN_NONE},
 		},
 	},
@@ -1627,6 +1635,50 @@ struct CAMERA_DEVICE_INFO gImgEepromInfo_atom_22365 = {
     .i4FrontStereoAddr = {0xFFFF, 0xFFFF},
 };
 
+struct IMGSENSOR_HW_POWER_SEQ platform_power_sequence_even[] = {
+    {
+        PLATFORM_POWER_SEQ_NAME,
+        {
+            {
+                IMGSENSOR_HW_PIN_MIPI_SWITCH_EN,
+                IMGSENSOR_HW_PIN_STATE_LEVEL_0,
+                0,
+                IMGSENSOR_HW_PIN_STATE_LEVEL_HIGH,
+                0
+            },
+            {
+                IMGSENSOR_HW_PIN_MIPI_SWITCH_SEL,
+                IMGSENSOR_HW_PIN_STATE_LEVEL_HIGH,
+                0,
+                IMGSENSOR_HW_PIN_STATE_LEVEL_0,
+                0
+            },
+        },
+        IMGSENSOR_SENSOR_IDX_SUB,
+    },
+    {
+        PLATFORM_POWER_SEQ_NAME,
+        {
+            {
+                IMGSENSOR_HW_PIN_MIPI_SWITCH_EN,
+                IMGSENSOR_HW_PIN_STATE_LEVEL_0,
+                0,
+                IMGSENSOR_HW_PIN_STATE_LEVEL_HIGH,
+                0
+            },
+            {
+                IMGSENSOR_HW_PIN_MIPI_SWITCH_SEL,
+                IMGSENSOR_HW_PIN_STATE_LEVEL_0,
+                0,
+                IMGSENSOR_HW_PIN_STATE_LEVEL_0,
+                0
+            },
+        },
+        IMGSENSOR_SENSOR_IDX_MAIN2,
+    },
+    {NULL,},
+};
+
 struct CAMERA_DEVICE_INFO gImgEepromInfo_even = {
     .i4SensorNum = 3,
     .pCamModuleInfo = {
@@ -1848,14 +1900,17 @@ void oplus_imgsensor_hwcfg(void)
     } else if (is_project(0x2167A) || is_project(0x2167B) || is_project(0x2167C) || is_project(0x2167D)) {
         oplus_imgsensor_custom_config = imgsensor_custom_config_even;
         oplus_sensor_power_sequence = sensor_power_sequence_even;
+        oplus_platform_power_sequence = platform_power_sequence_even;
         gImgEepromInfo = gImgEepromInfo_even;
     } else if (is_project(0x216AF) || is_project(0x216B0) || is_project(0x216B1)) {
         oplus_imgsensor_custom_config = imgsensor_custom_config_even;
         oplus_sensor_power_sequence = sensor_power_sequence_even;
+        oplus_platform_power_sequence = platform_power_sequence_even;
         gImgEepromInfo = gImgEepromInfo_even;
     } else if (is_project(20761) || is_project(20762) || is_project(20764) || is_project(20767)) {
         oplus_imgsensor_custom_config = imgsensor_custom_config_even;
         oplus_sensor_power_sequence = sensor_power_sequence_even;
+        oplus_platform_power_sequence = platform_power_sequence_even;
         gImgEepromInfo = gImgEepromInfo_even;
     } else if (is_project(22351) || is_project(22352) || is_project(22353)) {
         oplus_imgsensor_custom_config = imgsensor_custom_config_22351;

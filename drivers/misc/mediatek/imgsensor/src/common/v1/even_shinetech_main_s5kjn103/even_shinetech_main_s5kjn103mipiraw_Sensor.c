@@ -3025,7 +3025,7 @@ static kal_uint32 get_imgsensor_id(UINT32 *sensor_id)
 				read_cmos_sensor_8(0x0000),
 				read_cmos_sensor_8(0x0001),
 				read_cmos_sensor(0x0000), *sensor_id);
-			if (*sensor_id == 0x38e1) {
+			if (*sensor_id == 0x38e1 || *sensor_id == 0x38e4) {
 			    *sensor_id = imgsensor_info.sensor_id;
 				LOG_INF("i2c write id: 0x%x, sensor id: 0x%x\n",
 					imgsensor.i2c_write_id, *sensor_id);
@@ -3094,7 +3094,7 @@ static kal_uint32 open(void)
 		do {
 			sensor_id = ((read_cmos_sensor_8(0x0000) << 8) | read_cmos_sensor_8(0x0001));
 			LOG_INF("Read sensor id [0x0000~1]: 0x%x sensor_id: 0x%x\n", imgsensor.i2c_write_id, sensor_id);
-			if (sensor_id == 0x38e1) {
+			if (sensor_id == 0x38e1 || sensor_id == 0x38e4) {
 			    sensor_id = imgsensor_info.sensor_id;
 				LOG_INF("i2c write id: 0x%x, sensor id: 0x%x\n",
 					imgsensor.i2c_write_id, sensor_id);
