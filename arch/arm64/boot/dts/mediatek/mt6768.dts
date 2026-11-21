@@ -3180,6 +3180,13 @@ aliases {
 			<&infracfg_ao CLK_IFR_AP_DMA>;
 		clock-names = "main", "dma";
 		clock-div = <1>;
+		ch-offset-i2c = <0x100>;
+		ch-offset-scp = <0x200>;
+		ch-offset-ccu = <0x200>;
+		ch_offset_default = <0x100>;
+		ch_offset_ccu = <0x200>;
+		scl-gpio-id = <103>;
+		sda-gpio-id = <104>;
 		mediatek,control-irq-sel;
 		mediatek,control-rs-stop;
 		mediatek,dynamic-speed;
@@ -3194,6 +3201,13 @@ aliases {
 			<&infracfg_ao CLK_IFR_AP_DMA>;
 		clock-names = "main", "dma";
 		clock-div = <1>;
+		ch-offset-i2c = <0x100>;
+		ch-offset-scp = <0x200>;
+		ch-offset-ccu = <0x200>;
+		ch_offset_default = <0x100>;
+		ch_offset_ccu = <0x200>;
+		scl-gpio-id = <50>;
+		sda-gpio-id = <51>;
 		mediatek,control-irq-sel;
 		mediatek,control-rs-stop;
 	};
@@ -3207,6 +3221,13 @@ aliases {
 			<&infracfg_ao CLK_IFR_AP_DMA>;
 		clock-names = "main", "dma";
 		clock-div = <1>;
+		ch-offset-i2c = <0x100>;
+		ch-offset-scp = <0x200>;
+		ch-offset-ccu = <0x200>;
+		ch_offset_default = <0x100>;
+		ch_offset_ccu = <0x200>;
+		scl-gpio-id = <105>;
+		sda-gpio-id = <106>;
 		mediatek,control-irq-sel;
 		mediatek,control-rs-stop;
 		mediatek,dynamic-speed;
@@ -4832,6 +4853,7 @@ audio_extend: audio_extend {
 	kd_camera_hw1: kd_camera_hw1@1a040000 {
 		compatible = "mediatek,camera_hw";
 		reg = <0 0x1a040000 0 0x1000>;
+		pmic = <&main_pmic>;
 		/* SENINF_ADDR */
 		/* Camera Common Clock Framework (CCF) */
 		power-domains = <&scpsys MT6768_POWER_DOMAIN_CAM>;
@@ -4900,6 +4922,16 @@ audio_extend: audio_extend {
 		channel@2 {
 			type = <0>;
 			ct = <1>;
+			part = <0>;
+		};
+	};
+
+	flashlights_even: flashlights_even {
+		compatible = "mediatek,flashlights_even";
+		decouple = <1>;
+		channel@1 {
+			type = <0>;
+			ct = <0>;
 			part = <0>;
 		};
 	};
