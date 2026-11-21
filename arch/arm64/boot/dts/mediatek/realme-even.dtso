@@ -1,0 +1,14 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Device tree overlay for Realme even family (MT6768 / MT6769V/CZ).
+ */
+
+/dts-v1/;
+/plugin/;
+
+#include <dt-bindings/pinctrl/mt6768-pinfunc.h>
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/interrupt-controller/irq.h>
+#include <dt-bindings/input/input.h>
+
+#include "realme-even.dtsi"
