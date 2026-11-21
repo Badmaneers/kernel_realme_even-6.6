@@ -1177,6 +1177,7 @@ bool halInitOneMsduTokenInfo(struct ADAPTER *prAdapter,
 	u4TxHeadRoomSize = NIC_TX_DESC_AND_PADDING_LENGTH +
 		prChipInfo->txd_append_size;
 
+	INIT_LIST_HEAD(&prToken->msdu_list);
 	prToken->fgInUsed = FALSE;
 	prToken->prMsduInfo = NULL;
 
@@ -1194,8 +1195,9 @@ bool halInitOneMsduTokenInfo(struct ADAPTER *prAdapter,
 
 	if (!prToken->prPacket) {
 #if !CFG_SUPPORT_HIF_FIFO_TOKEN
-		list_add_tail(&prToken->msdu_list,
-			&prTokenInfo->init_msdu_list);
+		if (list_empty(&prToken->msdu_list))
+			list_add_tail(&prToken->msdu_list,
+				&prTokenInfo->init_msdu_list);
 #endif /* !CFG_SUPPORT_HIF_FIFO_TOKEN */
 		return false;
 	}
@@ -1209,8 +1211,9 @@ bool halInitOneMsduTokenInfo(struct ADAPTER *prAdapter,
 	if (!KAL_FIFO_IN(&prTokenInfo->rTokenFifo, prToken))
 		return false;
 #else
-	list_add_tail(&prToken->msdu_list,
-		&prTokenInfo->free_msdu_list);
+	if (list_empty(&prToken->msdu_list))
+		list_add_tail(&prToken->msdu_list,
+			&prTokenInfo->free_msdu_list);
 #endif /* CFG_SUPPORT_HIF_FIFO_TOKEN */
 
 	GLUE_INC_REF_CNT(prTokenInfo->u4TokenNum);
@@ -1270,8 +1273,8 @@ void halInitMsduTokenInfo(struct ADAPTER *prAdapter)
 		}
 #endif /* !CFG_MTK_WIFI_TX_CMA_MEM */
 
-		prToken = &prTokenInfo->arToken[u4TokenId];
-		if (halInitOneMsduTokenInfo(prAdapter, prToken, u4TokenId))
+		prToken = &prTokenInfo->arToken[u4Idx];
+		if (halInitOneMsduTokenInfo(prAdapter, prToken, u4Idx))
 			u4TokenId++;
 		else
 			u4FailCnt++;
