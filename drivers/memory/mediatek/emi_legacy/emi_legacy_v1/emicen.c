@@ -98,12 +98,13 @@ void mtk_emidbg_dump(void)
 {
 	unsigned long spinlock_save_flags;
 	struct arm_smccc_res smc_res;
+	int max_retry = 64;
 
 	spin_lock_irqsave(&emidbg_lock, spinlock_save_flags);
 
 	arm_smccc_smc(MTK_SIP_EMIMPU_CONTROL, MTK_EMIDBG_DUMP,
 		0, 0, 0, 0, 0, 0, &smc_res);
-	while (smc_res.a0 > 0) {
+	while (smc_res.a0 > 0 && max_retry-- > 0) {
 		arm_smccc_smc(MTK_SIP_EMIMPU_CONTROL, MTK_EMIDBG_MSG,
 		0, 0, 0, 0, 0, 0, &smc_res);
 

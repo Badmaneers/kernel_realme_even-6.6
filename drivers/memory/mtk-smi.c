@@ -6057,7 +6057,7 @@ static int __init mtk_smi_init(void)
 	smi_mme_init();
 	return platform_register_drivers(smidrivers, ARRAY_SIZE(smidrivers));
 }
-module_init(mtk_smi_init);
+subsys_initcall(mtk_smi_init);
 
 static void __exit mtk_smi_exit(void)
 {

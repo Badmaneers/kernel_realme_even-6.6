@@ -207,6 +207,10 @@ static struct platform_driver mtk_mmqos_mt6768_driver = {
 		.of_match_table = mtk_mmqos_mt6768_of_ids,
 	},
 };
-module_platform_driver(mtk_mmqos_mt6768_driver);
+static int __init mtk_mmqos_mt6768_init(void)
+{
+	return platform_driver_register(&mtk_mmqos_mt6768_driver);
+}
+subsys_initcall_sync(mtk_mmqos_mt6768_init);
 MODULE_LICENSE("GPL v2");
 
