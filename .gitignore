@@ -171,5 +171,7 @@ sphinx_*/
 /rust-project.json
 
 # Build outputs & local signing keys
-/out/
+out/
 certs/mtk_signing_key.pem
+clang
+anykernel
