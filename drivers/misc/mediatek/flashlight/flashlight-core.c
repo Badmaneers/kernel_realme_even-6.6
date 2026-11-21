@@ -78,6 +78,7 @@ extern const struct flashlight_device_id flashlight_id_sy6560[];
 extern const struct flashlight_device_id flashlight_id_orisa[];
 extern const struct flashlight_device_id flashlight_id_orisc[];
 extern const struct flashlight_device_id flashlight_id_miami[];
+extern const struct flashlight_device_id flashlight_id_even[];
 const struct flashlight_device_id *flashlight_id;
 int flashlight_device_num = 0;
 #endif
@@ -435,6 +436,12 @@ int flashlight_dev_register(
 	}
 	else if (is_project(23702) || is_project(23703) || is_project(23704) || is_project(23618)) {
 		flashlight_id = flashlight_id_ark;
+		flashlight_device_num = 1;
+	}
+	else if (is_project(0x2167A) || is_project(0x2167B) || is_project(0x2167C) || is_project(0x2167D)
+	        || is_project(0x216AF) || is_project(0x216B0) || is_project(0x216B1)
+	        || is_project(20761) || is_project(20762) || is_project(20764) || is_project(20767)) {
+		flashlight_id = flashlight_id_even;
 		flashlight_device_num = 1;
 	}
 	#endif /*OPLUS_FEATURE_CAMERA_COMMON*/

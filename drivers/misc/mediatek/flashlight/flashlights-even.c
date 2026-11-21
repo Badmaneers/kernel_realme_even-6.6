@@ -99,6 +99,14 @@ static int g_flash_duty = -1;
 
 #ifdef CONFIG_PM_WAKELOCKS
 struct wakeup_source even_flashlight_wake_lock;
+static void wakeup_source_init(struct wakeup_source *ws, const char *name)
+{
+	if (ws) {
+		memset(ws, 0, sizeof(*ws));
+		ws->name = name;
+		wakeup_source_add(ws);
+	}
+}
 #endif
 
 /* platform data */
