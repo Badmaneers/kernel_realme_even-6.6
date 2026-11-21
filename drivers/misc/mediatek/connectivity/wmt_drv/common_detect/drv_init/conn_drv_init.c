@@ -35,7 +35,6 @@ int do_connectivity_driver_init(int chip_id)
 	/* To avoid invoking more than once.*/
 	if (init_before)
 		return 0;
-	init_before = 1;
 
 	tmp_ret = do_common_drv_init(chip_id);
 	i_ret += tmp_ret;
@@ -43,6 +42,7 @@ int do_connectivity_driver_init(int chip_id)
 		WMT_DETECT_PR_ERR("do common driver not ready, ret:%d\n abort!\n", tmp_ret);
 		return i_ret;
 	}
+	init_before = 1;
 
 	tmp_ret = do_bluetooth_drv_init(chip_id);
 	i_ret += tmp_ret;

@@ -301,8 +301,7 @@ INT32 wmt_lib_init(VOID)
 	if (wmt_detect_get_chip_type() == WMT_CHIP_TYPE_SOC) {
 		iRet = wmt_conf_read_file();
 		if (iRet) {
-			WMT_ERR_FUNC("read wmt config file fail(%d)\n", iRet);
-			return -1;
+			WMT_WARN_FUNC("read wmt config file fail(%d), continuing with defaults\n", iRet);
 		}
 	}
 	osal_op_history_init(&pDevWmt->wmtd_op_history, 16);
