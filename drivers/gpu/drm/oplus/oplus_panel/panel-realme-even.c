@@ -861,18 +861,7 @@ static int lcm_bl_update_status(struct backlight_device *bl)
 
 static int lcm_bl_get_brightness(struct backlight_device *bl)
 {
-	struct mipi_dsi_device *dsi = bl_get_data(bl);
-	u16 brightness = 0;
-	int ret;
-
-	dsi->mode_flags &= ~MIPI_DSI_MODE_LPM;
-	ret = mipi_dsi_dcs_get_display_brightness_large(dsi, &brightness);
-	dsi->mode_flags |= MIPI_DSI_MODE_LPM;
-
-	if (ret < 0)
-		return oplus_display_brightness;
-
-	return brightness;
+	return oplus_display_brightness ? oplus_display_brightness : 2048;
 }
 
 static const struct backlight_ops lcm_bl_ops = {

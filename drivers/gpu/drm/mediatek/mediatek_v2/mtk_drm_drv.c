@@ -12492,7 +12492,7 @@ static void __exit mtk_drm_exit(void)
 	for (i = ARRAY_SIZE(mtk_drm_drivers) - 1; i >= 0; i--)
 		platform_driver_unregister(mtk_drm_drivers[i]);
 }
-module_init(mtk_drm_init);
+late_initcall(mtk_drm_init);
 module_exit(mtk_drm_exit);
 
 #if (IS_ENABLED(CONFIG_DRM_MEDIATEK_EDPTX_AUTO_SUPPORT) && IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO))

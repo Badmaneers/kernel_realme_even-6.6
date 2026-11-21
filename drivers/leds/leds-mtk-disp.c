@@ -197,7 +197,11 @@ static struct platform_driver led_disp_driver = {
 	.shutdown = led_disp_shutdown,
 };
 
-module_platform_driver(led_disp_driver);
+static int __init led_disp_init(void)
+{
+	return platform_driver_register(&led_disp_driver);
+}
+late_initcall_sync(led_disp_init);
 
 MODULE_AUTHOR("Mediatek Corporation");
 MODULE_DESCRIPTION("MTK Disp Backlight Driver");
