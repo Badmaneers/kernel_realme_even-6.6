@@ -145,6 +145,11 @@ static enum IMGSENSOR_RETURN mclk_set(
 
 		ppinctrl_state =
 pinst->ppinctrl_state[(unsigned int)sensor_idx][(unsigned int)state_index];
+		if ((ppinctrl_state == NULL || IS_ERR(ppinctrl_state)) &&
+		    sensor_idx == IMGSENSOR_SENSOR_IDX_MAIN3) {
+			ppinctrl_state =
+				pinst->ppinctrl_state[3][(unsigned int)state_index];
+		}
 		pr_debug(
 			"%s : sensor_idx %d pinctrl, pin %d, pin_state %d, drive_current %d\n",
 			__func__,

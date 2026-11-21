@@ -182,6 +182,12 @@ static enum IMGSENSOR_RETURN gpio_set(
 		ppinctrl_state =
 		    pgpio->ppinctrl_state_cam[(unsigned int)sensor_idx][
 			((pin - IMGSENSOR_HW_PIN_PDN) << 1) + gpio_state];
+		if ((ppinctrl_state == NULL || IS_ERR(ppinctrl_state)) &&
+		    sensor_idx == IMGSENSOR_SENSOR_IDX_MAIN3) {
+			ppinctrl_state =
+			    pgpio->ppinctrl_state_cam[3][
+				((pin - IMGSENSOR_HW_PIN_PDN) << 1) + gpio_state];
+		}
 	}
 	/*pr_debug("%s : pinctrl , state indx %d\n",
 	 *	    __func__,

@@ -4,10 +4,15 @@
  */
 
 #include "regulator.h"
+#include <linux/of_platform.h>
+#include <linux/regmap.h>
+#include <linux/mfd/mt6397/core.h>
+#include <linux/mfd/mt6358/registers.h>
 // #include "upmu_common.h"
 
 // #include <asm/siginfo.h>
 
+static struct regmap *g_regmap;
 static struct REGULATOR *preg_own;
 static bool Is_Notify_call[IMGSENSOR_SENSOR_IDX_MAX_NUM][REGULATOR_TYPE_MAX_NUM];
 
@@ -166,6 +171,27 @@ static enum IMGSENSOR_RETURN regulator_init(void *pinstance)
 		return IMGSENSOR_RETURN_ERROR;
 	}
 
+	{
+		struct device_node *pmic_node = NULL;
+		struct platform_device *pmic_pdev = NULL;
+		struct mt6397_chip *chip = NULL;
+
+		pmic_node = of_parse_phandle(pdevice->of_node, "pmic", 0);
+		if (!pmic_node)
+			pmic_node = of_find_compatible_node(NULL, NULL, "mediatek,mt6358");
+		if (pmic_node) {
+			pmic_pdev = of_find_device_by_node(pmic_node);
+			if (pmic_pdev) {
+				chip = dev_get_drvdata(&pmic_pdev->dev);
+				if (chip && chip->regmap) {
+					g_regmap = chip->regmap;
+					pr_info("[regulator] acquired MT6358 regmap\n");
+				}
+			}
+			of_node_put(pmic_node);
+		}
+	}
+
 	for (j = IMGSENSOR_SENSOR_IDX_MIN_NUM;
 		j < IMGSENSOR_SENSOR_IDX_MAX_NUM;
 		j++) {
@@ -244,28 +270,47 @@ static enum IMGSENSOR_RETURN regulator_set(
 		&preg->enable_cnt[(unsigned int)sensor_idx][
 			reg_type_offset + pin - IMGSENSOR_HW_PIN_AVDD];
 
+	/* Fallback: if sensor_idx == 4 and no regulator defined, use sensor_idx == 3 */
+	if (!pregulator && sensor_idx == IMGSENSOR_SENSOR_IDX_MAIN3) {
+		pregulator =
+			preg->pregulator[3][
+				reg_type_offset + pin - IMGSENSOR_HW_PIN_AVDD];
+		enable_cnt =
+			&preg->enable_cnt[3][
+				reg_type_offset + pin - IMGSENSOR_HW_PIN_AVDD];
+	}
+
 	if (pregulator) {
 		if (pin_state != IMGSENSOR_HW_PIN_STATE_LEVEL_0) {
+			int voltage = regulator_voltage[pin_state - IMGSENSOR_HW_PIN_STATE_LEVEL_0];
+			int min_uV = voltage;
+			int max_uV = voltage;
 
-			if (regulator_set_voltage(
-				pregulator,
-				regulator_voltage[
-				    pin_state - IMGSENSOR_HW_PIN_STATE_LEVEL_0],
-				regulator_voltage[
-				 pin_state - IMGSENSOR_HW_PIN_STATE_LEVEL_0])) {
-
-				pr_info(
-				    "[regulator]fail to regulator_set_voltage, powertype:%d powerId:%d\n",
-				    pin,
-				    regulator_voltage[
-				   pin_state - IMGSENSOR_HW_PIN_STATE_LEVEL_0]);
+			if (voltage == REGULATOR_VOLTAGE_1050) {
+				min_uV = 1000000;
+				max_uV = 1100000;
 			}
+
+			if (regulator_set_voltage(pregulator, min_uV, max_uV)) {
+				pr_info(
+				    "[regulator]fail to regulator_set_voltage, powertype:%d powerId:%d (min=%d, max=%d)\n",
+				    pin, voltage, min_uV, max_uV);
+			}
+
+			if (voltage == REGULATOR_VOLTAGE_1050 && (sensor_idx == 0 || sensor_idx == IMGSENSOR_SENSOR_IDX_MAIN)) {
+				int regval = 0;
+				if (g_regmap) {
+					regmap_write(g_regmap, MT6358_VCAMD_ANA_CON0, 0x405);
+					regmap_read(g_regmap, MT6358_VCAMD_ANA_CON0, &regval);
+					pr_info("[regulator] set vcamd to 1.05V via ANA_CON0=0x%x\n", regval);
+				}
+			}
+
 			if (regulator_enable(pregulator)) {
 				pr_info(
 				    "[regulator]fail to regulator_enable, powertype:%d powerId:%d\n",
 				    pin,
-				    regulator_voltage[
-				   pin_state - IMGSENSOR_HW_PIN_STATE_LEVEL_0]);
+				    voltage);
 
 				return IMGSENSOR_RETURN_ERROR;
 			}
@@ -281,6 +326,8 @@ static enum IMGSENSOR_RETURN regulator_set(
 					return IMGSENSOR_RETURN_ERROR;
 				}
 			}
+			/* Clear voltage constraint so shared rails (e.g. vcamd) are not locked */
+			regulator_set_voltage(pregulator, 0, INT_MAX);
 			atomic_dec(enable_cnt);
 		}
 	} else {
