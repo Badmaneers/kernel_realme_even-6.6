@@ -2378,12 +2378,20 @@ int sipa_i2c_probe(
 
 	sipa_of_node = of_parse_phandle(client->dev.of_node,
 							"si,sipa-dev", 0);
+	if (!sipa_of_node)
+		sipa_of_node = of_parse_phandle(client->dev.of_node,
+								"si,sia81xx-dev", 0);
 
 	/* get chip type name */
 	ret = of_property_read_string_index(sipa_of_node,
 				"si,si_pa_type",
 				0,
 				&chip_type_name);
+	if (0 != ret)
+		ret = of_property_read_string_index(sipa_of_node,
+					"si,sia81xx_type",
+					0,
+					&chip_type_name);
 	if (0 != ret) {
 		pr_err("[  err][%s] %s: get si,si_pa_type return %d !!! \r\n",
 			LOG_FLAG, __func__, ret);
@@ -2684,6 +2692,11 @@ static int sipa_probe(struct platform_device *pdev)
 				"si,si_pa_type",
 				0,
 				&chip_type_name);
+	if (0 != ret)
+		ret = of_property_read_string_index(pdev->dev.of_node,
+					"si,sia81xx_type",
+					0,
+					&chip_type_name);
 	if (0 != ret) {
 		pr_err("[  err][%s] %s: get si,si_pa_type return %d !!! \r\n",
 			LOG_FLAG, __func__, ret);
@@ -2701,6 +2714,9 @@ static int sipa_probe(struct platform_device *pdev)
 
 	ret = of_property_read_u32(pdev->dev.of_node,
 			"si,si_pa_disable_pin", &disable_pin);
+	if (0 != ret)
+		ret = of_property_read_u32(pdev->dev.of_node,
+				"si,sia81xx_disable_pin", &disable_pin);
 	if (0 != ret) {
 		pr_err("[  err][%s] %s: get si,si_pa_disable_pin return %d !!! \r\n",
 			LOG_FLAG, __func__, ret);
@@ -2747,6 +2763,9 @@ static int sipa_probe(struct platform_device *pdev)
 		/* get reset pin's sn */
 		rst_pin = of_get_named_gpio(
 			pdev->dev.of_node, "si,si_pa_reset", 0);
+		if (rst_pin < 0)
+			rst_pin = of_get_named_gpio(
+				pdev->dev.of_node, "si,sia81xx_reset", 0);
 		if (rst_pin < 0) {
 			pr_err("[  err][%s] %s: rst_pin < 0 !!! \r\n", LOG_FLAG, __func__);
 			ret = -ENODEV;
@@ -2791,6 +2810,8 @@ static int sipa_probe(struct platform_device *pdev)
 #else
 		/* get owi pin's sn */
 		owi_pin = of_get_named_gpio(pdev->dev.of_node, "si,si_pa_owi", 0);
+		if (owi_pin < 0)
+			owi_pin = of_get_named_gpio(pdev->dev.of_node, "si,sia81xx_owi", 0);
 		if (owi_pin < 0) {
 			pr_err("[  err][%s] %s: owi_pin < 0 !!! \r\n", LOG_FLAG, __func__);
 			ret = -ENODEV;
