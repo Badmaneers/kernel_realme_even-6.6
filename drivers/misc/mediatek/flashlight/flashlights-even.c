@@ -119,6 +119,78 @@ struct even_platform_data {
 /******************************************************************************
  * Pinctrl configuration
  *****************************************************************************/
+static void even_pinctrl_fixup(void)
+{
+	struct device_node *np;
+	struct device_node *pctrl_node;
+	const char *names[] = {
+		"default",
+		"hwen_high",
+		"hwen_low",
+		"flash_light_en_pin_0",
+		"flash_light_en_pin_1",
+		"flash_light_flash_pin_0",
+		"flash_light_flash_pin_1",
+		"flash_light_pwm_pin",
+		"flash_light_temp_pin_0",
+		"flash_light_temp_pin_1"
+	};
+	int i;
+
+	np = of_find_compatible_node(NULL, NULL, "mediatek,flashlights_even");
+	if (!np) {
+		pr_warn("flashlights_even: cannot find device node\n");
+		return;
+	}
+
+	pctrl_node = of_find_node_by_path("/pinctrl");
+	if (!pctrl_node) {
+		pr_warn("flashlights_even: cannot find /pinctrl node\n");
+		of_node_put(np);
+		return;
+	}
+
+	for (i = 0; i < ARRAY_SIZE(names); i++) {
+		char propname[16];
+		struct device_node *pin_node;
+
+		snprintf(propname, sizeof(propname), "pinctrl-%d", i);
+		pin_node = of_get_child_by_name(pctrl_node, names[i]);
+		if (pin_node) {
+			struct property *newprop;
+			__be32 *val;
+
+			newprop = kzalloc(sizeof(*newprop), GFP_KERNEL);
+			if (!newprop) {
+				of_node_put(pin_node);
+				break;
+			}
+			newprop->name = kstrdup(propname, GFP_KERNEL);
+			val = kmalloc(sizeof(__be32), GFP_KERNEL);
+			if (!val || !newprop->name) {
+				kfree(newprop->name);
+				kfree(val);
+				kfree(newprop);
+				of_node_put(pin_node);
+				break;
+			}
+			*val = cpu_to_be32(pin_node->phandle);
+			newprop->value = val;
+			newprop->length = sizeof(__be32);
+
+			of_update_property(np, newprop);
+			pr_info("flashlights_even: fixed %s -> %s (phandle 0x%x)\n",
+				propname, names[i], pin_node->phandle);
+			of_node_put(pin_node);
+		} else {
+			pr_warn("flashlights_even: child /pinctrl/%s not found\n", names[i]);
+		}
+	}
+
+	of_node_put(pctrl_node);
+	of_node_put(np);
+}
+
 static int even_pinctrl_init(struct platform_device *pdev)
 {
 	int ret = 0;
@@ -198,7 +270,10 @@ static int even_pinctrl_set(int pin, int state)
 				printk("set err, pin(%d) state(%d)\n", pin, state);
 			break;
 		case EVEN_PINCTRL_PIN_PWM_EN:
-			ret =pinctrl_select_state(even_pinctrl, even_flash_pwm);
+			if (!IS_ERR(even_flash_pwm))
+				ret = pinctrl_select_state(even_pinctrl, even_flash_pwm);
+			else
+				printk("set err, pwm pin state\n");
 			break;
 		case EVEN_PINCTRL_PIN_PWM_GPIO:
 			if (state == EVEN_PINCTRL_PIN_STATE_LOW &&!IS_ERR(even_pwm_gpio_low))
@@ -794,6 +869,8 @@ static int __init flashlight_even_init(void)
 	int ret;
 
 	printk("Init start.\n");
+
+	even_pinctrl_fixup();
 
 #ifndef CONFIG_OF
 	ret = platform_device_register(&even_pwm_platform_device);
