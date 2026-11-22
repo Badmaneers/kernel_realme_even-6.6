@@ -1648,7 +1648,7 @@ aliases {
 
 		dvfsrc_vcore: dvfsrc-vcore {
 			regulator-name = "dvfsrc-vcore";
-			regulator-min-microvolt = <650000>;
+			regulator-min-microvolt = <800000>;
 			regulator-max-microvolt = <800000>;
 			regulator-always-on;
 		};
@@ -5885,6 +5885,7 @@ audio_extend: audio_extend {
 };
 
 &mt_pmic_vcore_buck_reg {
+	regulator-min-microvolt = <800000>;
 	regulator-always-on;
 };
 
@@ -5904,6 +5905,7 @@ audio_extend: audio_extend {
 };
 
 &mt_pmic_vmodem_buck_reg {
+	regulator-min-microvolt = <750000>;
 	regulator-always-on;
 };
 
