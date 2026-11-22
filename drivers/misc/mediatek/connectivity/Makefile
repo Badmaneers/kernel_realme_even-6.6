@@ -65,6 +65,7 @@ ifneq ($(KERNELRELEASE),)
     obj-$(CONFIG_MTK_COMBO) += wlan/adaptor/
     obj-$(CONFIG_MTK_COMBO) += wlan/core/gen4m/
     obj-$(CONFIG_MTK_COMBO_BT) += bt/mt66xx/wmt/
+    obj-$(CONFIG_MTK_COMBO_GPS) += gps/gps_stp/
 
 # Otherwise we were called directly from the command line;
 # invoke the kernel build system.
