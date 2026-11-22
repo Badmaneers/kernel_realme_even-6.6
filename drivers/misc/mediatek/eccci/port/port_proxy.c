@@ -313,7 +313,7 @@ int port_dev_open(struct inode *inode, struct file *file)
 	}
 
 	if (port->rx_ch != CCCI_CCB_CTRL && atomic_read(&port->usage_cnt)) {
-		CCCI_ERROR_LOG(0, CHAR,
+		CCCI_DEBUG_LOG(0, CHAR,
 			"port %s open fail with EBUSY\n", port->name);
 		return -EBUSY;
 	}
