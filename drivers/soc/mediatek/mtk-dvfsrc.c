@@ -1714,6 +1714,20 @@ static int mtk_dvfsrc_probe(struct platform_device *pdev)
 		dev_info(dvfsrc->dev, "DVFSRC IRQ Enable\n");
 	}
 
+	if (of_device_is_compatible(pdev->dev.of_node, "mediatek,mt6768-dvfsrc")) {
+		/*
+		 * MT6768: Mask MD DVFS requests. SPM DVFS PCM firmware is not running
+		 * in modern kernels, so DVFSRC cannot arbitrate dynamic OPP transitions
+		 * from the modem. Setting MD_SW_CONTROL (0x84) masks MD requests to
+		 * prevent modem timeout at DVFS_drv.c:1923.
+		 */
+		writel(readl(dvfsrc->regs + 0x84) | 0x20000029, dvfsrc->regs + 0x84);
+		writel(0x0, dvfsrc->regs + 0x68);
+		writel(0x0, dvfsrc->regs + 0x80);
+		dev_info(dvfsrc->dev, "MT6768: Masked MD DVFS requests (MD_SW_CONTROL=0x%08x)\n",
+			readl(dvfsrc->regs + 0x84));
+	}
+
 	dvfsrc->regulator = platform_device_register_data(dvfsrc->dev,
 			"mtk-dvfsrc-regulator", -1, NULL, 0);
 	if (IS_ERR(dvfsrc->regulator)) {
