@@ -2,3 +2,4 @@
 
 source "drivers/misc/mediatek/Kconfig"
 source "drivers/misc/oplus/cs_press/Kconfig"
+source "drivers/misc/oplus/sim_detect/Kconfig"
