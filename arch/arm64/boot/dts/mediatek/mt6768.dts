@@ -59,6 +59,9 @@ aliases {
 		mtksmmu0 = &iommu;
 		mmc0 = &mmc0;
 		mmc1 = &mmc1;
+		mddriver = "/mddriver@10014000";
+		cldmadriver = "/cldmadriver@10014000";
+		ccifdriver = "/ccifdriver@10209000";
 	};
 
 	soc: soc {
@@ -2194,8 +2197,12 @@ aliases {
 		cldma-infracfg = <&infracfg_ao>;
 	};
 
-	mddriver:mddriver {
+	mddriver:mddriver@10014000 {
 		compatible = "mediatek,mddriver", "mediatek,mddriver-mt6768";
+		reg = <0 0x10014000 0 0x1000>,
+		      <0 0x1021b000 0 0x1000>,
+		      <0 0x10209000 0 0x1000>,
+		      <0 0x1020a000 0 0x1000>;
 		/* DTS/GIC_ID: MDWDT 75/107; CCIF0 164/196; CCIF0 165/197 */
 		interrupts = <GIC_SPI 75 IRQ_TYPE_EDGE_FALLING>,
 			     <GIC_SPI 164 IRQ_TYPE_LEVEL_LOW>,
@@ -2210,6 +2217,7 @@ aliases {
 		/* bit0:srcclkena|bit1:srclken_o1_on|bit2:revert_sequencer */
 		mediatek,power-flow-config = <0x1>;
 		mediatek,srclken-o1 = <0>;
+		mediatek,md_smem_size = <0x200000>;
 		clocks = <&scpsys_clk SCP_SYS_MD1>;
 		clock-names = "scp-sys-md1-main";
 		ccci-infracfg = <&infracfg_ao>;
