@@ -34,6 +34,15 @@
 		};
 	};
 
+	sgm41512_int_default: sgm41512_int_default {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO20__FUNC_GPIO20>;
+			slew-rate = <0>;
+			bias-pull-up;
+			input-enable;
+		};
+	};
+
 	flashlights_even_pins_default: default {
 	};
 
@@ -211,9 +220,13 @@
 		compatible = "ti,sgm41512-charger", "ti,bq25601d", "ti,bq25601";
 		reg = <0x6b>;
 		status = "okay";
+		charger_name = "SGM41512";
 		ti,watchdog-timeout-ms = <0>;
 		interrupt-parent = <&pio>;
-		interrupts = <7 IRQ_TYPE_LEVEL_LOW>;
+		interrupts = <20 IRQ_TYPE_EDGE_FALLING 20 0>;
+		chg-irq-gpio = <&pio 20 0x0>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&sgm41512_int_default>;
 	};
 
 	sia81xx_i2c_L: sia81xx_i2c@L {

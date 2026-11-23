@@ -682,16 +682,14 @@ int oplus_usb_get_property(struct power_supply *psy, enum power_supply_property 
 	}
 
 	if (chip->charger_exist) {
-		if ((chip->charger_type == POWER_SUPPLY_TYPE_USB || chip->charger_type == POWER_SUPPLY_TYPE_USB_CDP ||
-		     chip->charger_type == POWER_SUPPLY_TYPE_USB_PD_SDP) &&
-		    chip->stop_chg == 1) {
+		if (chip->charger_type == POWER_SUPPLY_TYPE_USB || chip->charger_type == POWER_SUPPLY_TYPE_USB_CDP ||
+		    chip->charger_type == POWER_SUPPLY_TYPE_USB_PD_SDP) {
 			chip->usb_online = true;
 			if (chip->charger_type == POWER_SUPPLY_TYPE_USB_CDP)
 				chip->usb_psd.type = POWER_SUPPLY_TYPE_USB_CDP;
 			else
 				chip->usb_psd.type = POWER_SUPPLY_TYPE_USB;
-		} else if (!(chip->charger_type == POWER_SUPPLY_TYPE_USB ||
-			     chip->charger_type == POWER_SUPPLY_TYPE_USB_CDP)) {
+		} else {
 			chip->usb_online = false;
 		}
 	} else {
@@ -766,7 +764,7 @@ int oplus_ac_get_property(struct power_supply *psy, enum power_supply_property p
 		if ((oplus_vooc_get_fastchg_started() == true) || (oplus_vooc_get_fastchg_to_normal() == true) ||
 		    (oplus_vooc_get_fastchg_to_warm() == true) || (oplus_vooc_get_fastchg_dummy_started() == true) ||
 		    (oplus_vooc_get_adapter_update_status() == ADAPTER_FW_NEED_UPDATE) ||
-		    (oplus_vooc_get_btb_temp_over() == true) || chip->mmi_fastchg == 0 ||
+		    (oplus_vooc_get_btb_temp_over() == true) ||
 		    oplus_quirks_keep_connect_status()) {
 			chip->ac_online = true;
 		} else {
