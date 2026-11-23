@@ -76,10 +76,12 @@ aliases {
 				max-brightness = <4095>;
 				max-hw-brightness = <4095>;
 				min-hw-brightness = <1>;
+				led-mode = <4>;
 				led_mode = <4>;
 				led-bits = <12>;
 				trans-bits = <12>;
 				default-state = "on";
+				apollo-state = "disable";
 			};
 		};
 

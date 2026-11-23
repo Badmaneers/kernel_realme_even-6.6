@@ -75,7 +75,6 @@ struct even_panel_desc;
 struct lcm {
 	struct device *dev;
 	struct drm_panel panel;
-	struct backlight_device *backlight;
 	struct gpio_desc *reset_gpio;
 	struct gpio_desc *bias_pos, *bias_neg;
 	struct regulator *vddio;
@@ -665,8 +664,6 @@ static struct mtk_panel_params hlt_ili7807s_ext_params = {
 };
 
 static struct mtk_panel_params even_boe_ext_params = {
-	.vendor = "nt36525b",
-	.manufacture = "hlt_boe",
 	.pll_clk = 368,
 	.data_rate = 735,
 	.physical_width_um = 68000,
@@ -837,52 +834,6 @@ static struct mtk_panel_funcs ext_funcs = {
 	.reset = panel_ext_reset,
 };
 
-static int lcm_bl_update_status(struct backlight_device *bl)
-{
-	struct mipi_dsi_device *dsi = bl_get_data(bl);
-	u16 brightness = backlight_get_brightness(bl);
-	u8 bl_cmd[3];
-	int ret;
-
-	if (brightness > 4095)
-		brightness = 4095;
-
-	bl_cmd[0] = 0x51;
-	bl_cmd[1] = (brightness >> 9) & 0x0f;
-	bl_cmd[2] = (brightness >> 1) & 0xff;
-
-	dsi->mode_flags &= ~MIPI_DSI_MODE_LPM;
-	ret = mipi_dsi_dcs_write_buffer(dsi, bl_cmd, sizeof(bl_cmd));
-	dsi->mode_flags |= MIPI_DSI_MODE_LPM;
-
-	oplus_display_brightness = brightness;
-	return ret < 0 ? ret : 0;
-}
-
-static int lcm_bl_get_brightness(struct backlight_device *bl)
-{
-	return oplus_display_brightness ? oplus_display_brightness : 2048;
-}
-
-static const struct backlight_ops lcm_bl_ops = {
-	.update_status = lcm_bl_update_status,
-	.get_brightness = lcm_bl_get_brightness,
-};
-
-static struct backlight_device *lcm_create_backlight(struct mipi_dsi_device *dsi)
-{
-	struct device *dev = &dsi->dev;
-	const struct backlight_properties props = {
-		.type = BACKLIGHT_RAW,
-		.brightness = 2048,
-		.max_brightness = 4095,
-		.scale = BACKLIGHT_SCALE_NON_LINEAR,
-	};
-
-	return devm_backlight_device_register(dev, dev_name(dev), dev, dsi,
-					      &lcm_bl_ops, &props);
-}
-
 /* ==========================================================================
  * Standard DRM Panel Operations
  * ========================================================================== */
@@ -936,22 +887,9 @@ static int lcm_unprepare(struct drm_panel *panel)
 static int lcm_enable(struct drm_panel *panel)
 {
 	struct lcm *ctx = panel_to_lcm(panel);
-	struct mipi_dsi_device *dsi = to_mipi_dsi_device(ctx->dev);
-	u8 bl_cmd[3] = { 0x51, 0x04, 0x00 };
 
 	if (ctx->enabled)
 		return 0;
-
-	/* Send MSB-first DCS brightness command to unblank backlight */
-	dsi->mode_flags &= ~MIPI_DSI_MODE_LPM;
-	mipi_dsi_dcs_write_buffer(dsi, bl_cmd, sizeof(bl_cmd));
-	dsi->mode_flags |= MIPI_DSI_MODE_LPM;
-
-	if (ctx->backlight) {
-		ctx->backlight->props.brightness = 2048;
-		ctx->backlight->props.power = FB_BLANK_UNBLANK;
-		backlight_update_status(ctx->backlight);
-	}
 
 	ctx->enabled = true;
 	return 0;
@@ -960,20 +898,9 @@ static int lcm_enable(struct drm_panel *panel)
 static int lcm_disable(struct drm_panel *panel)
 {
 	struct lcm *ctx = panel_to_lcm(panel);
-	struct mipi_dsi_device *dsi = to_mipi_dsi_device(ctx->dev);
-	u8 bl_cmd[3] = { 0x51, 0x00, 0x00 };
 
 	if (!ctx->enabled)
 		return 0;
-
-	if (ctx->backlight) {
-		ctx->backlight->props.power = FB_BLANK_POWERDOWN;
-		backlight_update_status(ctx->backlight);
-	}
-
-	dsi->mode_flags &= ~MIPI_DSI_MODE_LPM;
-	mipi_dsi_dcs_write_buffer(dsi, bl_cmd, sizeof(bl_cmd));
-	dsi->mode_flags |= MIPI_DSI_MODE_LPM;
 
 	ctx->enabled = false;
 	return 0;
@@ -1084,18 +1011,11 @@ static int lcm_probe(struct mipi_dsi_device *dsi)
 			dev_warn(dev, "failed to enable vsn on probe\n");
 	}
 
-	/* Register DCS backlight */
-	ctx->backlight = lcm_create_backlight(dsi);
-	if (IS_ERR(ctx->backlight)) {
-		dev_warn(dev, "failed to register backlight device: %ld\n", PTR_ERR(ctx->backlight));
-		ctx->backlight = NULL;
-	}
-
 	ctx->prepared = true;
 	ctx->enabled = true;
 	ctx->panel.dev = dev;
 	ctx->panel.funcs = &lcm_drm_funcs;
-	ctx->panel.backlight = ctx->backlight;
+	ctx->panel.backlight = NULL;
 
 	drm_panel_init(&ctx->panel, dev, &lcm_drm_funcs, DRM_MODE_CONNECTOR_DSI);
 	drm_panel_add(&ctx->panel);

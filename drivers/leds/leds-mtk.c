@@ -60,8 +60,8 @@ int mt_leds_call_notifier(unsigned long action, void *data)
 EXPORT_SYMBOL_GPL(mt_leds_call_notifier);
 
 #ifdef OPLUS_FEATURE_DISPLAY_APOLLO
-unsigned int mBrightnessValue = 1;
-bool mApolloDisable = false;
+unsigned int mBrightnessValue = 2048;
+bool mApolloDisable = true;
 bool oplus_apollo_unsupported(void) {
 	return mApolloDisable;
 }
@@ -638,8 +638,11 @@ int mt_leds_parse_dt(struct mt_led_data *mdev, struct fwnode_handle *fwnode)
 	}
 	ret = fwnode_property_read_u32(fwnode,
 		"led-mode", &(mdev->conf.mode));
+	if (ret)
+		ret = fwnode_property_read_u32(fwnode,
+			"led_mode", &(mdev->conf.mode));
 	if (ret) {
-		pr_info("No min-brightness, use default value 1");
+		pr_info("No led-mode property, use default value 1");
 		mdev->conf.mode = MT_LED_MODE_CUST_BLS_I2C;
 	}
 	mdev->conf.limit_hw_brightness = mdev->conf.max_hw_brightness;
@@ -658,12 +661,12 @@ int mt_leds_parse_dt(struct mt_led_data *mdev, struct fwnode_handle *fwnode)
 #ifdef OPLUS_FEATURE_DISPLAY_APOLLO
 	ret = fwnode_property_read_string(fwnode, "apollo-state", &state);
 	if (!ret) {
-		if (!strncmp(state, "disable", strlen("disable")))
-			mApolloDisable = true;
-		else
+		if (!strncmp(state, "enable", strlen("enable")))
 			mApolloDisable = false;
+		else
+			mApolloDisable = true;
 	} else {
-		mApolloDisable = false;
+		mApolloDisable = true;
 	}
 	pr_info("parse mApolloDisable: %d\n", mApolloDisable);
 #endif /* OPLUS_FEATURE_DISPLAY_APOLLO */
@@ -763,8 +766,8 @@ int mt_leds_classdev_register(struct device *parent,
 	if (ret < 0 || ret >= (4096 - strlen(led_dat->debug.buffer)))
 		pr_info("print log init error!");
 
-	led_dat->last_brightness = 0;
-	if (!(oplus_apollo_unsupported())) {
+	led_dat->last_brightness = led_dat->conf.cdev.brightness;
+	if (led_dat->conf.cdev.brightness > 0) {
 		mtk_set_hw_brightness(led_dat,
 			brightness_maptolevel(&led_dat->conf, led_dat->conf.cdev.brightness),
 			0, 1 << SET_BACKLIGHT_LEVEL);

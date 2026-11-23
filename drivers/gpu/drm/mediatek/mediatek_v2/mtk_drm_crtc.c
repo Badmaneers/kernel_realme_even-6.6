@@ -116,6 +116,7 @@ extern bool oplus_apollo_unsupported(void);
 
 #ifdef OPLUS_FEATURE_DISPLAY
 extern int g_commit_pid;
+extern unsigned int oplus_display_brightness;
 #endif /* OPLUS_FEATURE_DISPLAY */
 
 // [0] after mode switch [1] fps hint
@@ -2477,30 +2478,21 @@ int mtk_drm_setbacklight(struct drm_crtc *crtc, unsigned int level,
 	}
 #endif /*OPLUS_FEATURE_DISPLAY_APOLLO*/
 
+	if (!crtc->state || !mtk_crtc->enabled) {
+		DDPINFO("Sleep State set backlight stop --crtc not enable\n");
+		CRTC_MMP_EVENT_END(index, backlight, 0, 0);
+		return 0;
+	}
+
 	if (lock)
 		DDP_MUTEX_LOCK(&mtk_crtc->lock, __func__, __LINE__);
 	if (pq_data->new_persist_property[DISP_PQ_CCORR_SILKY_BRIGHTNESS])
 		sb_backlight = level;
 
-	if (crtc->state == NULL){
-		DDPINFO("Sleep State set backlight stop --crtc not ebable\n");
-		CRTC_MMP_EVENT_END(index, backlight, 0, 0);
-		if (lock)
-			DDP_MUTEX_UNLOCK(&mtk_crtc->lock, __func__, __LINE__);
-		return -EINVAL;
-	}
 	comp = mtk_ddp_comp_request_output(mtk_crtc);
 	pq_data = mtk_crtc->pq_data;
 	if (pq_data && pq_data->new_persist_property[DISP_PQ_CCORR_SILKY_BRIGHTNESS])
 		sb_backlight = level;
-
-	if (!(mtk_crtc->enabled)) {
-		DDPINFO("Sleep State set backlight stop --crtc not ebable\n");
-		CRTC_MMP_EVENT_END(index, backlight, 0, 0);
-		if (lock)
-			DDP_MUTEX_UNLOCK(&mtk_crtc->lock, __func__, __LINE__);
-		return -EINVAL;
-	}
 
 	if (!comp) {
 		DDPINFO("%s no output comp\n", __func__);
