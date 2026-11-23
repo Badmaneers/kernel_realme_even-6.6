@@ -2233,10 +2233,26 @@ aliases {
 				"infra-ccif2-md";
 		};
 
-	md1_sim1_hot_plug_eint:MD1-SIM1-HOT-PLUG-EINT {
+	md1_sim1_hot_plug_eint: MD1-SIM1-HOT-PLUG-EINT {
+		compatible = "mediatek,md1_sim1_hot_plug_eint-eint";
+		interrupts = <0 8>;
+		debounce = <0 10000>;
+		dedicated = <0 0>;
+		src-pin = <0 1>;
+		src_pin = <0 1>;
+		sockettype = <0 0>;
+		status = "okay";
 	};
 
-	md1_sim2_hot_plug_eint:MD1-SIM2-HOT-PLUG-EINT {
+	md1_sim2_hot_plug_eint: MD1-SIM2-HOT-PLUG-EINT {
+		compatible = "mediatek,md1_sim2_hot_plug_eint-eint";
+		interrupts = <1 8>;
+		debounce = <1 10000>;
+		dedicated = <1 0>;
+		src-pin = <1 2>;
+		src_pin = <1 2>;
+		sockettype = <1 0>;
+		status = "okay";
 	};
 
 	bpi_bsi_slv0@1021e000 {
@@ -5385,8 +5401,20 @@ audio_extend: audio_extend {
 	smart_pa: smart_pa {
 	};
 
-	gpio_usage_mapping:gpio {
+	gpio_usage_mapping: gpio {
 		compatible = "mediatek,gpio_usage_mapping";
+		GPIO_FDD_BAND_SUPPORT_DETECT_2ND_PIN = <&pio 22 0>;
+		GPIO_FDD_BAND_SUPPORT_DETECT_3RD_PIN = <&pio 40 0>;
+		GPIO_SIM2_HOT_PLUG = <&pio 46 0>;
+		GPIO_SIM1_HOT_PLUG = <&pio 47 0>;
+		GPIO_FDD_BAND_SUPPORT_DETECT_1ST_PIN = <&pio 91 0>;
+		GPIO_FDD_BAND_SUPPORT_DETECT_4TH_PIN = <&pio 92 0>;
+		GPIO_SIM2_SIO = <&pio 155 0>;
+		GPIO_SIM2_SRST = <&pio 156 0>;
+		GPIO_SIM2_SCLK = <&pio 157 0>;
+		GPIO_SIM1_SCLK = <&pio 172 0>;
+		GPIO_SIM1_SRST = <&pio 173 0>;
+		GPIO_SIM1_SIO = <&pio 174 0>;
 	};
 
 	drm_wv: drm_wv {
@@ -5948,6 +5976,14 @@ audio_extend: audio_extend {
 };
 &mt_pmic_vaud28_ldo_reg {
 	regulator-always-on;
+};
+
+&mt_pmic_vsim1_ldo_reg {
+	status = "okay";
+};
+
+&mt_pmic_vsim2_ldo_reg {
+	status = "okay";
 };
 
 &mddriver {

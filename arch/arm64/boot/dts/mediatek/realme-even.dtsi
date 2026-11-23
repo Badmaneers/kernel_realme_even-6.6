@@ -43,6 +43,31 @@
 		};
 	};
 
+	md_sim_pins_default: md_sim_pins_default {
+		pins_sim1_hotplug {
+			pinmux = <PINMUX_GPIO47__FUNC_MD_INT1_C2K_UIM0_HOT_PLUG>;
+			bias-pull-up;
+			input-enable;
+		};
+		pins_sim2_hotplug {
+			pinmux = <PINMUX_GPIO46__FUNC_MD_INT2_C2K_UIM1_HOT_PLUG>;
+			bias-pull-up;
+			input-enable;
+		};
+		pins_sim1 {
+			pinmux = <PINMUX_GPIO172__FUNC_MD1_SIM1_SCLK>,
+				 <PINMUX_GPIO173__FUNC_MD1_SIM1_SRST>,
+				 <PINMUX_GPIO174__FUNC_MD1_SIM1_SIO>;
+			bias-pull-up;
+		};
+		pins_sim2 {
+			pinmux = <PINMUX_GPIO155__FUNC_MD1_SIM2_SIO>,
+				 <PINMUX_GPIO156__FUNC_MD1_SIM2_SRST>,
+				 <PINMUX_GPIO157__FUNC_MD1_SIM2_SCLK>;
+			bias-pull-up;
+		};
+	};
+
 	flashlights_even_pins_default: default {
 	};
 
@@ -396,4 +421,16 @@
 	io-channels = <&auxadc 3>, <&auxadc 4>;
 	io-channel-names = "usbtemp-ch3", "usbtemp-ch4";
 	status = "okay";
+};
+
+&mddriver {
+	pinctrl-names = "default";
+	pinctrl-0 = <&md_sim_pins_default>;
+};
+
+/ {
+	oplus_sim_detect: oplus_sim_detect {
+		compatible = "oplus, sim_detect";
+		Hw,sim_det = <&pio 47 0x00>;
+	};
 };
