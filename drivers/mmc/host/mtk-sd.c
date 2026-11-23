@@ -2918,6 +2918,13 @@ static int msdc_drv_probe(struct platform_device *pdev)
 	pm_runtime_set_autosuspend_delay(host->dev, MTK_MMC_AUTOSUSPEND_DELAY);
 	pm_runtime_use_autosuspend(host->dev);
 	pm_runtime_enable(host->dev);
+
+	if (mmc->index == 1) {
+		ret = device_rename(&pdev->dev, "externdevice");
+		if (ret)
+			dev_warn(&pdev->dev, "Failed to rename to externdevice: %d\n", ret);
+	}
+
 	ret = mmc_add_host(mmc);
 
 	if (ret)
