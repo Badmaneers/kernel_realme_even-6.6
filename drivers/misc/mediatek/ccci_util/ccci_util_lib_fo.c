@@ -803,32 +803,58 @@ static int __init collect_lk_boot_arguments(void)
 {
 	/* Device tree method */
 	struct device_node *node = NULL;
-//	int ret;
-	unsigned int *raw_ptr;
+	struct device_node *chosen = NULL;
+	unsigned int *raw_ptr = NULL;
 
+	/* 1. LK puts ccci,modem_info_v2 / ccci,modem_info into /chosen node */
+	chosen = of_find_node_by_path("/chosen");
+	if (chosen) {
+		raw_ptr = (unsigned int *)of_get_property(chosen, "ccci,modem_info_v2", NULL);
+		if (raw_ptr != NULL) {
+			CCCI_UTIL_INF_MSG("found ccci,modem_info_v2 in /chosen\n");
+			if (lk_info_parsing_v2(raw_ptr) == 1) /* No md enabled in LK */
+				return 0;
+			goto _common_process;
+		}
+		raw_ptr = (unsigned int *)of_get_property(chosen, "ccci,modem_info", NULL);
+		if (raw_ptr != NULL) {
+			CCCI_UTIL_INF_MSG("found ccci,modem_info in /chosen\n");
+			lk_info_parsing_v1(raw_ptr);
+			goto _common_process;
+		}
+	}
+
+	/* 2. Fall back to mediatek,mddriver node */
 	node = of_find_compatible_node(NULL, NULL, "mediatek,mddriver");
-	if (!node) {
-		CCCI_UTIL_INF_MSG("device node no mediatek,mddriver node\n");
-		return -1;
+	if (!node)
+		node = of_find_node_by_path("/mddriver@10014000");
+	if (!node)
+		node = of_find_node_by_path("/mddriver");
+
+	if (node) {
+		raw_ptr = (unsigned int *)of_get_property(node, "ccci,modem_info_v2", NULL);
+		if (raw_ptr != NULL) {
+			CCCI_UTIL_INF_MSG("found ccci,modem_info_v2 in mddriver node\n");
+			if (lk_info_parsing_v2(raw_ptr) == 1) /* No md enabled in LK */
+				return 0;
+			goto _common_process;
+		}
+		raw_ptr = (unsigned int *)of_get_property(node, "ccci,modem_info", NULL);
+		if (raw_ptr != NULL) {
+			CCCI_UTIL_INF_MSG("found ccci,modem_info in mddriver node\n");
+			lk_info_parsing_v1(raw_ptr);
+			goto _common_process;
+		}
 	}
 
-	raw_ptr = (unsigned int *)of_get_property(node, "ccci,modem_info_v2",
-			NULL);
-	if (raw_ptr != NULL) {
-		if (lk_info_parsing_v2(raw_ptr) == 1) /* No md enabled in LK */
-			return 0;
-		goto _common_process;
+	CCCI_UTIL_INF_MSG("ccci,modem_info not found in /chosen or mddriver, using fallback\n");
+	if (node) {
+		s_g_md_usage_case |= (1 << MD_SYS1);
+		s_g_lk_load_img_status |= LK_LOAD_MD_EN;
+		md_type_at_lk = 6293;
+		return 0;
 	}
 
-	CCCI_UTIL_INF_MSG("ccci,modem_info_v2 not found, try v1\n");
-	raw_ptr = (unsigned int *)of_get_property(node, "ccci,modem_info",
-			NULL);
-	if (raw_ptr != NULL) {
-		lk_info_parsing_v1(raw_ptr);
-		goto _common_process;
-	}
-
-	CCCI_UTIL_INF_MSG("ccci,modem_info_v1 still not found, using v0!!!\n");
 	return -1;
 
 _common_process:
