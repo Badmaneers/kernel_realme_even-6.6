@@ -61,9 +61,9 @@ static ssize_t fp_event_node_read(struct file *file, char __user *buf, size_t co
     return count;
 }
 
-static struct file_operations fp_event_func = {
-    .write = NULL,
-    .read = fp_event_node_read,
+static const struct proc_ops fp_event_func = {
+    .proc_read = fp_event_node_read,
+    .proc_lseek = default_llseek,
 };
 
 int fp_event_register_proc_fs(void)

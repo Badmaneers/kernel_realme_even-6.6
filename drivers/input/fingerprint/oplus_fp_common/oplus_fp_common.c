@@ -10,6 +10,7 @@
 #include <linux/seq_file.h>
 #include <linux/fs.h>
 #include <linux/of_gpio.h>
+#include <linux/pinctrl/consumer.h>
 #include <asm/uaccess.h>
 #include <linux/delay.h>
 #include <linux/string.h>
@@ -127,7 +128,7 @@ static int get_manufacture_id_value(struct fp_data *fp_data)
         fp_data->fp_id[0] = 2;
         dev_info(fp_data->dev, "fp_id: %d ->silead\n", fp_data->fp_id[0]);
     } else {
-        dev_err(fp_data->dev, "fp_id not define, default is 0", ret);
+        dev_err(fp_data->dev, "fp_id not define, default is 0\n");
     }
 
     devm_pinctrl_put(fp_id_pinctrl);
@@ -243,9 +244,10 @@ static ssize_t fp_id_node_write(struct file *file, const char __user *buf, size_
     return count;
 }
 
-static struct file_operations fp_id_node_ctrl = {
-    .read = fp_id_node_read,
-    .write = fp_id_node_write,
+static const struct proc_ops fp_id_node_ctrl = {
+    .proc_read = fp_id_node_read,
+    .proc_write = fp_id_node_write,
+    .proc_lseek = default_llseek,
 };
 
 void opticalfp_irq_handler_register(opticalfp_handler handler) {
@@ -412,9 +414,9 @@ static ssize_t lcd_type_node_read(struct file *file, char __user *buf, size_t co
     return len < count ? len  : count;
 }
 
-static struct file_operations lcd_type_node_ctrl = {
-    .read = lcd_type_node_read,
-    .write = NULL,
+static const struct proc_ops lcd_type_node_ctrl = {
+    .proc_read = lcd_type_node_read,
+    .proc_lseek = default_llseek,
 };
 
 
@@ -441,9 +443,9 @@ static ssize_t fp_tee_node_write(struct file *file, const char __user *buf, size
     return count;
 }
 
-static struct file_operations tee_bind_func = {
-    .write = fp_tee_node_write,
-    .read = NULL,
+static const struct proc_ops tee_bind_func = {
+    .proc_write = fp_tee_node_write,
+    .proc_lseek = default_llseek,
 };
 
 static int teecore_register_proc_fs(void)
