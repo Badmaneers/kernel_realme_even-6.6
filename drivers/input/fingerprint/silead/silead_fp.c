@@ -124,6 +124,8 @@ struct silfp_data {
     int   irq_ignore;
     s32 power_is_off;
     int		rst_port;
+    int		avdd_port;
+    int		vddio_port;
     struct work_struct  work;
     struct completion done;
     struct wake_lock wakelock;
@@ -151,10 +153,6 @@ struct silfp_data {
     struct regulator *avdd_ldo;
     struct regulator *vddio_ldo;
 #endif /* BSP_SIL_POWER_SUPPLY_REGULATOR */
-#ifdef BSP_SIL_POWER_SUPPLY_GPIO
-    int avdd_port;
-    int vddio_port;
-#endif /* BSP_SIL_POWER_SUPPLY_GPIO */
 #ifdef PROC_NODE
     struct proc_dir_entry *proc_root;
     struct proc_dir_entry *proc_entry;
@@ -507,6 +505,9 @@ static void silfp_late_resume(struct early_suspend *es)
 }
 #else
 #if ((LINUX_VERSION_CODE > KERNEL_VERSION(4, 9, 0)) && (LINUX_VERSION_CODE < KERNEL_VERSION(4, 19, 0)))
+#define MTK_ONSCREENFINGERPRINT_EVENT 20
+#endif
+#ifndef MTK_ONSCREENFINGERPRINT_EVENT
 #define MTK_ONSCREENFINGERPRINT_EVENT 20
 #endif
 static int silfp_fb_callback(struct notifier_block *notif,
@@ -1008,12 +1009,10 @@ silfp_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
      * from the kernel perspective; so they look reversed.
      */
     if (_IOC_DIR(cmd) & _IOC_READ) {
-        err = !access_ok(VERIFY_WRITE,
-                         (void __user *)arg, _IOC_SIZE(cmd));
+        err = !access_ok((void __user *)arg, _IOC_SIZE(cmd));
     }
     if (err == 0 && _IOC_DIR(cmd) & _IOC_WRITE) {
-        err = !access_ok(VERIFY_READ,
-                         (void __user *)arg, _IOC_SIZE(cmd));
+        err = !access_ok((void __user *)arg, _IOC_SIZE(cmd));
     }
     if (err) {
         return -EFAULT;
@@ -1414,7 +1413,7 @@ err_devt:
     return status;
 }
 
-static int silfp_remove(struct spi_device *spi)
+static void silfp_remove(struct spi_device *spi)
 {
     struct silfp_data	*fp_dev = spi_get_drvdata(spi);
 
@@ -1435,8 +1434,6 @@ static int silfp_remove(struct spi_device *spi)
     if (fp_dev->users == 0)
         kfree(fp_dev);
     mutex_unlock(&device_list_lock);
-
-    return 0;
 }
 
 static const struct of_device_id sildev_dt_ids[] = {
@@ -1492,7 +1489,7 @@ static int __init silfp_dev_init(void)
         return status;
     }
 
-    silfp_class = class_create(THIS_MODULE, "silead_fp");
+    silfp_class = class_create("silead_fp");
     if (IS_ERR(silfp_class)) {
         unregister_chrdev(FP_DEV_MAJOR, silfp_driver.driver.name);
         return PTR_ERR(silfp_class);
