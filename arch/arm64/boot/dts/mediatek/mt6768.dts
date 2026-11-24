@@ -2701,6 +2701,10 @@ aliases {
 		compatible = "goodix,goodix_fp";
 	};
 
+	egis_fp: egis_fp {
+		compatible = "mediatek,finger-fp";
+	};
+
 	oplus_fp_common:oplus_fp_common { //Slave driver and CS ID
 		compatible = "oplus,fp_common"; //Manufacture, and Model
 	};

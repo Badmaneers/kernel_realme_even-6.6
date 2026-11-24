@@ -404,3 +404,123 @@
 		Hw,sim_det = <&pio 47 0x00>;
 	};
 };
+
+&spi5 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	status = "okay";
+	finger_spi@0 {
+		compatible = "mediatek,fingerspi-fp";
+		reg = <0>;
+		spi-max-frequency = <8000000>;
+		netlink-event = <30>;
+		spi-id = <1>;
+		spi-irq = <5>;
+		spi-reg = <0x11015000>;
+		spi-avdd-gpio = <158>;
+		spi-rst-gpio = <&pio 4 0x00>;
+		spi-pwr-gpio = <&pio 158 0x00>;
+		status = "okay";
+	};
+};
+
+&egis_fp {
+	egis,pmic_disable = <0>;
+	sil,ldo_disable = <1>;
+	sil,silead_irq = <&pio 5 0x00>;
+	sil,silead_rst = <&pio 4 0x00>;
+	sil,silead_pwr = <&pio 158 0x00>;
+	pinctrl-names = "default", "rst-low", "rst-high",
+	                "irq-init", "power_high", "power_low";
+	pinctrl-0 = <&silfp_default>;
+	pinctrl-1 = <&silfp_rst_low>;
+	pinctrl-2 = <&silfp_rst_high>;
+	pinctrl-3 = <&silfp_irq>;
+	pinctrl-4 = <&fingerfp_power_high>;
+	pinctrl-5 = <&fingerfp_power_low>;
+	status = "okay";
+};
+
+&pio {
+	silfp_default: silfpdefault {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO4__FUNC_GPIO4>;
+			slew-rate = <1>;
+			output-high;
+		};
+	};
+	silfp_rst_low: state_reset_low {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO4__FUNC_GPIO4>;
+			slew-rate = <1>;
+			output-low;
+		};
+	};
+	silfp_rst_high: state_reset_high {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO4__FUNC_GPIO4>;
+			slew-rate = <1>;
+			output-high;
+		};
+	};
+	silfp_irq: fp_eint@5 {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO5__FUNC_GPIO5>;
+			slew-rate = <0>;
+			bias-disable;
+		};
+	};
+	fingerfp_power_high: state_power_high {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO158__FUNC_GPIO158>;
+			slew-rate = <1>;
+			output-high;
+		};
+	};
+	fingerfp_power_low: state_power_low {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO158__FUNC_GPIO158>;
+			slew-rate = <1>;
+			output-low;
+		};
+	};
+
+	gpio_id0_up: gpio_id0_up {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO38__FUNC_GPIO38>;
+			slew-rate = <0>;
+			bias-pull-up;
+			input-enable;
+		};
+	};
+	gpio_id0_down: gpio_id0_down {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO38__FUNC_GPIO38>;
+			slew-rate = <0>;
+			bias-pull-down;
+			input-enable;
+		};
+	};
+};
+
+&oplus_fp_common {
+	compatible = "oplus,fp_common";
+	oplus,fp_gpio_num = <1>;
+	oplus,fp_gpio_0 = <&pio 38 0x00>;
+	oplus,one_gpio_for_three_ic = <1>;
+	pinctrl-names = "gpio_id0_up", "gpio_id0_down";
+	pinctrl-0 = <&gpio_id0_up>;
+	pinctrl-1 = <&gpio_id0_down>;
+	egis_520 {
+		oplus,fp-id = <1>;
+		vendor-chip = <18>;
+		eng-menu = "-1,-1";
+		chip-name = "E_520";
+	};
+	silead {
+		oplus,fp-id = <0>;
+		vendor-chip = <21>;
+		eng-menu = "-1,-1";
+		chip-name = "S_gsl6150";
+	};
+};
