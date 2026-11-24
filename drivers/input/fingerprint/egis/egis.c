@@ -27,6 +27,7 @@
 #include <linux/of_platform.h>							  
 #include <linux/of_gpio.h>
 #include <linux/regulator/consumer.h>
+#include <linux/pinctrl/consumer.h>
 #include <linux/spi/spi.h>
 #include <linux/pm_wakeup.h>
 #include <linux/jiffies.h>
@@ -78,7 +79,7 @@ unsigned int bufsiz = 4096;
 int gpio_irq;
 int request_irq_done = 0;
 int egistec_platformInit_done = 0;
-static struct wakeup_source wakeup_source_fp;
+static struct wakeup_source *wakeup_source_fp;
 static struct regulator *finger_regulator;
 
 #define EDGE_TRIGGER_FALLING    0x0
@@ -228,8 +229,6 @@ int Interrupt_Init(struct egistec_data *egistec,int int_mode,int detect_period,i
 	int err = 0;
 	int status = 0;
     struct device_node *node = NULL;
-    struct irq_desc *desc = NULL;
-    struct irq_desc *desc1 = NULL;
 
 DEBUG_PRINT("FP --  %s mode = %d period = %d threshold = %d\n",__func__,int_mode,detect_period,detect_threshold);
 DEBUG_PRINT("FP --  %s request_irq_done = %d gpio_irq = %d  pin = %d  \n",__func__,request_irq_done,gpio_irq, egistec->irqPin);
@@ -297,8 +296,6 @@ DEBUG_PRINT("FP --  %s request_irq_done = %d gpio_irq = %d  pin = %d  \n",__func
 		fps_ints.drdy_irq_flag = DRDY_IRQ_ENABLE;
 		enable_irq_wake(gpio_irq);
 
-desc1 = irq_to_desc(gpio_irq);
-		DEBUG_PRINT("huzhonghua:****depth state =  %d\n", desc1->depth);
 		request_irq_done = 1;
                 g_data->irq_enable_flag = 1;
 	}
@@ -370,9 +367,13 @@ static void egistec_reset(struct egistec_data *egistec)
 	DEBUG_PRINT("%s\n", __func__);
 	
 	#ifdef CONFIG_OF
-	pinctrl_select_state(egistec->pinctrl_gpios, egistec->pins_reset_low);
-	mdelay(15);
-	pinctrl_select_state(egistec->pinctrl_gpios, egistec->pins_reset_high);
+	if (egistec->pinctrl_gpios && !IS_ERR(egistec->pinctrl_gpios) &&
+	    egistec->pins_reset_low && !IS_ERR(egistec->pins_reset_low) &&
+	    egistec->pins_reset_high && !IS_ERR(egistec->pins_reset_high)) {
+		pinctrl_select_state(egistec->pinctrl_gpios, egistec->pins_reset_low);
+		mdelay(15);
+		pinctrl_select_state(egistec->pinctrl_gpios, egistec->pins_reset_high);
+	}
 	#endif	
 	
 }
@@ -472,11 +473,11 @@ static long egistec_ioctl(struct file *filp, unsigned int cmd, unsigned long arg
 		goto done;
 	case FP_WAKELOCK_TIMEOUT_ENABLE: //0Xb1
 			DEBUG_PRINT("EGISTEC fp_ioctl <<< FP_WAKELOCK_TIMEOUT_ENABLE  \n");
-			__pm_wakeup_event(&wakeup_source_fp, msecs_to_jiffies(1500));
+			__pm_wakeup_event(wakeup_source_fp, msecs_to_jiffies(1500));
 		goto done;
 	case FP_WAKELOCK_TIMEOUT_DISABLE: //0Xb2
 			DEBUG_PRINT("EGISTEC fp_ioctl <<< FP_WAKELOCK_TIMEOUT_DISABLE  \n");
-			__pm_relax(&wakeup_source_fp);
+			__pm_relax(wakeup_source_fp);
 		goto done;
 	default:
 	retval = -ENOTTY;
@@ -894,7 +895,7 @@ static int et512_spi_probe(struct spi_device *spi)
 }
 
 /* -------------------------------------------------------------------- */
-static int et512_spi_remove(struct spi_device *spi)
+static void et512_spi_remove(struct spi_device *spi)
 {
 	et512_data_t *et512 = spi_get_drvdata(spi);
 	spi_clk_enable(0);
@@ -910,8 +911,6 @@ static int et512_spi_remove(struct spi_device *spi)
 
 	//et512_cleanup(et512, spi);
 	kfree(et512);
-
-	return 0;
 }
 
 
@@ -986,7 +985,7 @@ static int egistec_probe(struct platform_device *pdev)
 			return status;
 	}
 
-	egistec_class = class_create(THIS_MODULE, "et512");
+	egistec_class = class_create("et512");
 	if (IS_ERR(egistec_class)) {
 		pr_err("%s class_create error.\n", __func__);
 		unregister_chrdev(ET512_MAJOR, egistec_driver.driver.name);
@@ -1019,12 +1018,7 @@ static int egistec_probe(struct platform_device *pdev)
 	/* Initialize the driver data */
 	egistec->pd = pdev;
 	g_data = egistec;
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(4, 14, 0)
-    wakeup_source_init(&wakeup_source_fp, "et580_wakeup");
-#else
-    wakeup_source_prepare(&wakeup_source_fp, "et580_wakeup");
-    wakeup_source_add(&wakeup_source_fp);
-#endif
+    wakeup_source_fp = wakeup_source_register(&pdev->dev, "et580_wakeup");
 	spin_lock_init(&egistec->spi_lock);
 	mutex_init(&egistec->buf_lock);
 	mutex_init(&device_list_lock);
