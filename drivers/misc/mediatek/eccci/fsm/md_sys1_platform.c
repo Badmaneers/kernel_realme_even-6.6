@@ -42,6 +42,12 @@
 
 extern atomic_t md_ee_occurred;
 
+#if IS_BUILTIN(CONFIG_MTK_SPM)
+extern int is_spm_enabled(void);
+#else
+static inline int is_spm_enabled(void) { return 0; }
+#endif
+
 static struct regulator *vcore_reg_ref;
 static int is_hold;
 unsigned int ap_plat_info;
@@ -190,6 +196,11 @@ void md_cd_lock_modem_clock_src(int locked)
 {
 	int settle;
 	struct arm_smccc_res res = {0};
+
+	if (md_cd_plat_val_ptr.md_gen < 6295 && s_md_clock_src_callback) {
+		s_md_clock_src_callback(locked);
+		return;
+	}
 
 	arm_smccc_smc(MTK_SIP_KERNEL_CCCI_CONTROL, MD_CLOCK_REQUEST,
 		MD_REG_AP_MDSRC_REQ, locked, 0, 0, 0, 0, &res);
@@ -1013,6 +1024,8 @@ static int md_cd_power_off(struct ccci_modem *md, unsigned int timeout)
 	}
 
 	flight_mode_set_by_atf(md, true);
+	if (s_notify_flightmode)
+		s_notify_flightmode(true);
 
 	/* enable sequencer setting to AOC2.5 for gen98 */
 	if ((md_cd_plat_val_ptr.md_gen == 6298) && ccci_get_hs2_done_status()) {
@@ -1779,7 +1792,7 @@ int md_cd_vcore_config(unsigned int hold_req)
 		CCCI_BOOTUP_LOG(0, TAG,
 			"[POWER ON]%s: get vcore voltage(%d)\n", __func__, ret);
 
-		{
+		if (!is_spm_enabled()) {
 			void __iomem *dvfsrc_reg = ioremap_wc(0x10012000, 0x100);
 			if (dvfsrc_reg) {
 				writel(readl(dvfsrc_reg + 0x84) | 0x20000029, dvfsrc_reg + 0x84);
@@ -1793,15 +1806,18 @@ int md_cd_vcore_config(unsigned int hold_req)
 
 		is_hold = 1;
 	} else if (hold_req == 0 && is_hold) {
-		CCCI_BOOTUP_LOG(0, TAG,
-			"[POWER ON]%s: hold_req=0, keep vcore operating floor active (is_hold=%d)\n",
-			__func__, is_hold);
-		/*
-		 * DO NOT release the regulator or reset voltage to 0.
-		 * On MT6768, releasing dvfsrc-vcore causes VCORE to drop to 0.65V,
-		 * and subsequent modem DVFS scaling times out (DVFS_drv.c:1923 assert).
-		 * Keep the operating voltage held while modem is online.
-		 */
+		if (is_spm_enabled()) {
+			if (vcore_reg_ref && !IS_ERR(vcore_reg_ref))
+				regulator_set_voltage(vcore_reg_ref, 0, INT_MAX);
+			is_hold = 0;
+			CCCI_BOOTUP_LOG(0, TAG,
+				"[POWER ON]%s: hold_req=0, released vcore floor for SPM DVFS\n",
+				__func__);
+		} else {
+			CCCI_BOOTUP_LOG(0, TAG,
+				"[POWER ON]%s: hold_req=0, SPM disabled, keeping vcore floor (is_hold=%d)\n",
+				__func__, is_hold);
+		}
 	} else
 		CCCI_ERROR_LOG(0, TAG,
 			"[POWER ON]%s: invalid hold_req: is_hold=%d, hold_req=%d\n",
@@ -1860,6 +1876,8 @@ static int md_cd_power_on(struct ccci_modem *md)
 
 	/* step 3: power on MD_INFRA and MODEM_TOP */
 	flight_mode_set_by_atf(md, false);
+	if (s_notify_flightmode)
+		s_notify_flightmode(false);
 	CCCI_BOOTUP_LOG(0, TAG,
 		"[POWER ON] MD MTCMOS ON start\n");
 	CCCI_NORMAL_LOG(0, TAG,
@@ -1910,7 +1928,10 @@ static int md_cd_power_on(struct ccci_modem *md)
 		md1_pll_init(md);
 		/* step 8: disable MD WDT */
 		md_rgu_base = ioremap(0x200f0100, 0x300);
-		ccci_write32(md_rgu_base, 0, 0x55000030); //0x200f0000 + 0x100
+		if (md_rgu_base) {
+			ccci_write32(md_rgu_base, 0, 0x55000030); //0x200f0000 + 0x100
+			iounmap(md_rgu_base);
+		}
 	} else
 		md_pll_setting(md);
 
