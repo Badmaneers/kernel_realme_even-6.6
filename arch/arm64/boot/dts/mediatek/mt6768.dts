@@ -1653,7 +1653,7 @@ aliases {
 
 		dvfsrc_vcore: dvfsrc-vcore {
 			regulator-name = "dvfsrc-vcore";
-			regulator-min-microvolt = <800000>;
+			regulator-min-microvolt = <650000>;
 			regulator-max-microvolt = <800000>;
 			regulator-always-on;
 		};
@@ -2363,7 +2363,7 @@ aliases {
 			<0 0x1022e000 0 0x1000>, /* DDRPHY NAO CHA */
 			<0 0x10236000 0 0x1000>, /* DDRPHY NAO CHB */
 			<0 0x10006000 0 0x1000>; /* SLEEP BASE */
-		dram_type = <3>; /* TYPE_LPDDR4X */
+		dram_type = <6>; /* TYPE_LPDDR4X */
 		support_ch_cnt = <2>;
 		ch_cnt = <2>;
 		rk_cnt = <2>;
@@ -5927,7 +5927,6 @@ audio_extend: audio_extend {
 };
 
 &mt_pmic_vcore_buck_reg {
-	regulator-min-microvolt = <800000>;
 	regulator-always-on;
 };
 
@@ -5947,7 +5946,6 @@ audio_extend: audio_extend {
 };
 
 &mt_pmic_vmodem_buck_reg {
-	regulator-min-microvolt = <750000>;
 	regulator-always-on;
 };
 
