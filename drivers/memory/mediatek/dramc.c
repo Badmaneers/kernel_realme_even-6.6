@@ -250,6 +250,27 @@ static int dramc_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
+	{
+		unsigned int max_freq = 0;
+
+		if (!of_property_read_u32_index(dramc_node, "freq_step",
+						0, &max_freq)) {
+			unsigned int raw_type = dramc_dev_ptr->dram_type;
+
+			if (raw_type == 3 && max_freq >= 2400)
+				dramc_dev_ptr->dram_type = TYPE_LPDDR4X;
+			else if (raw_type == 2 && max_freq >= 2400)
+				dramc_dev_ptr->dram_type = TYPE_LPDDR4;
+			else if (raw_type == 1 && max_freq >= 1600)
+				dramc_dev_ptr->dram_type = TYPE_LPDDR3;
+
+			if (dramc_dev_ptr->dram_type != raw_type)
+				pr_info("%s: remap legacy dram_type %u -> %u (max_freq=%u)\n",
+					__func__, raw_type,
+					dramc_dev_ptr->dram_type, max_freq);
+		}
+	}
+
 	ret = of_property_read_u32(dramc_node,
 		"support_ch_cnt", &(dramc_dev_ptr->support_ch_cnt));
 	if (ret) {
