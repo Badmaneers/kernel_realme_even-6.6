@@ -43,6 +43,20 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(mtk_pm_qos_update_request);
 #define MTK_SIP_MEM_RS_REQ		0x40
 #define MTK_SIP_MEM_RS_REL		0x41
 
+#if IS_BUILTIN(CONFIG_MTK_SPM)
+extern int spm_get_spmfw_idx(void);
+extern int spm_load_firmware_status(void);
+extern int is_spm_enabled(void);
+extern void mtk_spmfw_init(int dvfsrc_en, int skip_check);
+extern void spm_dvfs_pwrap_cmd(int pwrap_cmd, int pwrap_vcore);
+#else
+static inline int spm_get_spmfw_idx(void) { return -ENODEV; }
+static inline int spm_load_firmware_status(void) { return -ENODEV; }
+static inline int is_spm_enabled(void) { return 0; }
+static inline void mtk_spmfw_init(int dvfsrc_en, int skip_check) {}
+static inline void spm_dvfs_pwrap_cmd(int pwrap_cmd, int pwrap_vcore) {}
+#endif
+
 
 #define DVFSRC_OPP_DESC(_opp_table)	\
 {	\
@@ -115,6 +129,7 @@ struct mtk_dvfsrc {
 	struct mutex pstate_lock;
 	struct notifier_block scpsys_notifier;
 	bool dvfsrc_enable;
+	bool legacy_init;
 #ifdef DVFSRC_FORCE_OPP_SUPPORT
 	bool opp_forced;
 	bool opp_force_lock;
@@ -401,13 +416,18 @@ static const int mt6989_regs[] = {
 	[DVFSRC_HALT_CONTROL]  =    0xC4,
 };
 static const int mt6768_regs[] = {
+	[DVFSRC_BASIC_CONTROL] =	0x0,
 	[DVFSRC_SW_REQ] =		0x4,
+	[DVFSRC_SW_REQ2] =		0x8,
 	[DVFSRC_LEVEL] =		0xDC,
 	[DVFSRC_SW_BW] =		0x16C,
 	[DVFSRC_SW_PEAK_BW] =		0x160,
 	[DVFSRC_VCORE_REQUEST] =	0x48,
-	[DVFSRC_BASIC_CONTROL] =	0x0,
+	[DVFSRC_INT] =			0x98,
+	[DVFSRC_INT_EN] =		0x9C,
+	[DVFSRC_INT_CLR] =		0xA0,
 	[DVFSRC_TARGET_FORCE] =		0x300,
+	[DVFSRC_LAST] =			0x308,
 };
 
 static const int mt6991_regs[] = {
@@ -1410,6 +1430,9 @@ void mtk_dvfsrc_send_request(const struct device *dev, u32 cmd, u64 data)
 	struct arm_smccc_res ares;
 	struct mtk_dvfsrc *dvfsrc = dev_get_drvdata(dev);
 
+	if (!dvfsrc->dvfsrc_enable && !dvfsrc->legacy_init)
+		return;
+
 	switch (cmd) {
 	case MTK_DVFSRC_CMD_BW_REQUEST:
 		dvfsrc->dvd->set_dram_bw(dvfsrc, data);
@@ -1620,6 +1643,180 @@ static irqreturn_t mtk_dvfsrc_irq_handler_thread(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
+struct mt6768_reg_val {
+	u32 offset;
+	u32 val;
+};
+
+static const struct mt6768_reg_val mt6768_legacy_common_regs[] = {
+	{ 0x00C, 0x00240009 }, /* DVFSRC_EMI_REQUEST */
+	{ 0x014, 0x09000000 }, /* DVFSRC_EMI_REQUEST3 */
+	{ 0x030, 0x0000003F }, /* DVFSRC_EMI_MD2SPM0 */
+	{ 0x034, 0x00000000 }, /* DVFSRC_EMI_MD2SPM1 */
+	{ 0x038, 0x000080C0 }, /* DVFSRC_EMI_MD2SPM2 */
+	{ 0x03C, 0x00000007 }, /* DVFSRC_EMI_MD2SPM0_T */
+	{ 0x040, 0x00000038 }, /* DVFSRC_EMI_MD2SPM1_T */
+	{ 0x044, 0x000080C0 }, /* DVFSRC_EMI_MD2SPM2_T */
+	{ 0x084, 0x20000000 }, /* DVFSRC_MD_SW_CONTROL */
+	{ 0x0D8, 0x00000014 }, /* DVFSRC_TIMEOUT_NEXTREQ */
+	{ 0x09C, 0x00000003 }, /* DVFSRC_INT_EN */
+	{ 0x0E0, 0x00010000 }, /* DVFSRC_LEVEL_LABEL_0_1 */
+	{ 0x0E4, 0x00020101 }, /* DVFSRC_LEVEL_LABEL_2_3 */
+	{ 0x0E8, 0x01020012 }, /* DVFSRC_LEVEL_LABEL_4_5 */
+	{ 0x0EC, 0x02120112 }, /* DVFSRC_LEVEL_LABEL_6_7 */
+	{ 0x0F0, 0x00230013 }, /* DVFSRC_LEVEL_LABEL_8_9 */
+	{ 0x0F4, 0x01230113 }, /* DVFSRC_LEVEL_LABEL_10_11 */
+	{ 0x0F8, 0x02230213 }, /* DVFSRC_LEVEL_LABEL_12_13 */
+	{ 0x0FC, 0x03230323 }, /* DVFSRC_LEVEL_LABEL_14_15 */
+	{ 0x604, 0x0000000C }, /* DVFSRC_RSRV_1 */
+	{ 0x180, 0x0000407F }, /* DVFSRC_QOS_EN */
+};
+
+static const struct mt6768_reg_val mt6768_legacy_lp4_regs[] = {
+	{ 0x018, 0x003E362C }, /* DVFSRC_EMI_HRT */
+	{ 0x024, 0x00000033 }, /* DVFSRC_EMI_QOS0 */
+	{ 0x028, 0x0000004C }, /* DVFSRC_EMI_QOS1 */
+	{ 0x050, 0x00000036 }, /* DVFSRC_VCORE_HRT */
+};
+
+static const struct mt6768_reg_val mt6768_legacy_lp3_regs[] = {
+	{ 0x018, 0x00000020 }, /* DVFSRC_EMI_HRT */
+	{ 0x024, 0x00000026 }, /* DVFSRC_EMI_QOS0 */
+	{ 0x028, 0x00000033 }, /* DVFSRC_EMI_QOS1 */
+	{ 0x050, 0x00000020 }, /* DVFSRC_VCORE_HRT */
+};
+
+static void mt6768_write_reg_table(void __iomem *regs,
+				   const struct mt6768_reg_val *tbl, size_t n)
+{
+	size_t i;
+
+	for (i = 0; i < n; i++)
+		writel(tbl[i].val, regs + tbl[i].offset);
+}
+
+static void mt6768_legacy_mask_md(struct mtk_dvfsrc *dvfsrc)
+{
+	writel(readl(dvfsrc->regs + 0x84) | 0x20000029, dvfsrc->regs + 0x84);
+	writel(0x0, dvfsrc->regs + 0x68);
+	writel(0x0, dvfsrc->regs + 0x80);
+	dev_warn(dvfsrc->dev, "MT6768: Masked MD DVFS requests (MD_SW_CONTROL=0x%08x)\n",
+		 readl(dvfsrc->regs + 0x84));
+}
+
+static void mt6768_legacy_probe_fallback(struct mtk_dvfsrc *dvfsrc)
+{
+	int spm_idx;
+
+	if (!of_device_is_compatible(dvfsrc->dev->of_node, "mediatek,mt6768-dvfsrc"))
+		return;
+
+	spm_idx = spm_get_spmfw_idx();
+	if (spm_idx < 0 || spm_idx >= dvfsrc->dvd->num_opp_desc ||
+	    !dvfsrc->dvd->opps_desc[spm_idx].opps) {
+		dev_warn(dvfsrc->dev,
+			 "MT6768: invalid spmfw_idx %d, falling back to LP4X 3600\n",
+			 spm_idx);
+		spm_idx = 1;
+	}
+
+	dvfsrc->dram_type = spm_idx;
+	dvfsrc->legacy_init = true;
+	dvfsrc->dvfsrc_enable = false;
+	dev_info(dvfsrc->dev,
+		 "MT6768: legacy ATF detected, deferring SPM/DVFSRC start (spmfw_idx=%d)\n",
+		 spm_idx);
+}
+
+/**
+ * mtk_dvfsrc_legacy_start - Bring up SPM DVFS PCM and DVFSRC on legacy 4.19 ATF.
+ * @dev: Parent DVFSRC platform device from mtk-dvfsrc-start.
+ *
+ * Called at late_initcall_sync after late_initcall(mtk_sleep_init) has mapped
+ * SPM base addresses, mirroring the 4.19 helio-dvfsrc-v2 bringup sequence.
+ */
+int mtk_dvfsrc_legacy_start(struct device *dev)
+{
+	struct mtk_dvfsrc *dvfsrc;
+	const struct mt6768_reg_val *timing_regs;
+	size_t timing_cnt;
+	int ret;
+
+	if (!dev)
+		return -EINVAL;
+
+	dvfsrc = dev_get_drvdata(dev);
+	if (!dvfsrc || !dvfsrc->legacy_init)
+		return 0;
+
+	if (spm_load_firmware_status() <= 0) {
+		dev_err(dvfsrc->dev, "MT6768: SPM firmware not ready (%d)\n",
+			spm_load_firmware_status());
+		dvfsrc->legacy_init = false;
+		dvfsrc->dvfsrc_enable = false;
+		mt6768_legacy_mask_md(dvfsrc);
+		return -ENODEV;
+	}
+
+	/* Program 4.19 VCORE PMIC wrap command slots before starting SPM PCM */
+	spm_dvfs_pwrap_cmd(0, 0x30); /* VCORE_OPP_0: 800000 uV */
+	spm_dvfs_pwrap_cmd(2, 0x20); /* VCORE_OPP_1: 700000 uV */
+	spm_dvfs_pwrap_cmd(3, 0x20); /* VCORE_OPP_2: 700000 uV */
+	spm_dvfs_pwrap_cmd(4, 0x18); /* VCORE_OPP_3: 650000 uV */
+
+	mt6768_write_reg_table(dvfsrc->regs, mt6768_legacy_common_regs,
+			       ARRAY_SIZE(mt6768_legacy_common_regs));
+	if (dvfsrc->dram_type == 3) {
+		timing_regs = mt6768_legacy_lp3_regs;
+		timing_cnt = ARRAY_SIZE(mt6768_legacy_lp3_regs);
+	} else {
+		timing_regs = mt6768_legacy_lp4_regs;
+		timing_cnt = ARRAY_SIZE(mt6768_legacy_lp4_regs);
+	}
+	mt6768_write_reg_table(dvfsrc->regs, timing_regs, timing_cnt);
+
+	/* Keep OPP forced at highest gear until SPM PCM firmware is running */
+	writel(0x40000000, dvfsrc->regs + 0x300);
+	writel(0x0000407B, dvfsrc->regs + 0x000);
+	writel(0x0000017B, dvfsrc->regs + 0x000);
+
+	mtk_spmfw_init(1, 0);
+	if (!is_spm_enabled()) {
+		dev_err(dvfsrc->dev, "MT6768: SPM PCM failed to start\n");
+		dvfsrc->legacy_init = false;
+		dvfsrc->dvfsrc_enable = false;
+		mt6768_legacy_mask_md(dvfsrc);
+		return -ENODEV;
+	}
+
+	/* Re-latch control and release OPP force so DVFSRC/SPM free-run */
+	writel(0x40000000, dvfsrc->regs + 0x300);
+	writel(0x0000407B, dvfsrc->regs + 0x000);
+	writel(0x0000017B, dvfsrc->regs + 0x000);
+	writel(0x00000000, dvfsrc->regs + 0x300);
+
+	/* Clear any stale timeout interrupt latched prior to SPM start */
+	writel(0x00000003, dvfsrc->regs + 0x0A0);
+	writel(0x00000000, dvfsrc->regs + 0x0A0);
+
+	udelay(STARTUP_TIME);
+	ret = dvfsrc_wait_for_idle(dvfsrc);
+	if (ret)
+		dev_warn(dvfsrc->dev, "MT6768: initial DVFSRC settle timeout (LEVEL=0x%08x)\n",
+			 dvfsrc_read(dvfsrc, DVFSRC_LEVEL));
+
+	dvfsrc->legacy_init = false;
+	dvfsrc->dvfsrc_enable = true;
+
+	dev_info(dvfsrc->dev,
+		 "MT6768: legacy SPM/DVFSRC enabled (spm=%d, LEVEL=0x%08x, INT=0x%08x, MD_SW_CONTROL=0x%08x)\n",
+		 is_spm_enabled(), dvfsrc_read(dvfsrc, DVFSRC_LEVEL),
+		 dvfsrc_read(dvfsrc, DVFSRC_INT), readl(dvfsrc->regs + 0x84));
+
+	return 1;
+}
+EXPORT_SYMBOL_GPL(mtk_dvfsrc_legacy_start);
+
 static int mtk_dvfsrc_probe(struct platform_device *pdev)
 {
 	struct arm_smccc_res ares;
@@ -1669,8 +1866,10 @@ static int mtk_dvfsrc_probe(struct platform_device *pdev)
 		if (!ares.a0) {
 			dvfsrc->dram_type = ares.a1;
 			dvfsrc->dvfsrc_enable = true;
-		} else
+		} else {
 			dev_info(dvfsrc->dev, "dvfs mode is disabled\n");
+			mt6768_legacy_probe_fallback(dvfsrc);
+		}
 	} else
 		dev_info(dvfsrc->dev, "dvfs mode is bringup mode\n");
 #else
@@ -1680,17 +1879,29 @@ static int mtk_dvfsrc_probe(struct platform_device *pdev)
 	if (!ares.a0) {
 		dvfsrc->dram_type = ares.a1;
 		dvfsrc->dvfsrc_enable = true;
-	} else
+	} else {
 		dev_info(dvfsrc->dev, "dvfs mode is disabled\n");
+		mt6768_legacy_probe_fallback(dvfsrc);
+	}
 #endif
 
 	if (dvfsrc->dram_type < 0 ||
 	    dvfsrc->dram_type >= dvfsrc->dvd->num_opp_desc) {
-		dev_warn(dvfsrc->dev,
-			 "invalid dram_type %d from SMC, disabling dvfsrc\n",
-			 dvfsrc->dram_type);
-		dvfsrc->dram_type = 0;
-		dvfsrc->dvfsrc_enable = false;
+#ifdef DVFSRC_PROPERTY_ENABLE
+		if (!is_bringup && !dvfsrc->legacy_init &&
+		    of_device_is_compatible(pdev->dev.of_node, "mediatek,mt6768-dvfsrc")) {
+#else
+		if (!dvfsrc->legacy_init &&
+		    of_device_is_compatible(pdev->dev.of_node, "mediatek,mt6768-dvfsrc")) {
+#endif
+			mt6768_legacy_probe_fallback(dvfsrc);
+		} else {
+			dev_warn(dvfsrc->dev,
+				 "invalid dram_type %d from SMC, disabling dvfsrc\n",
+				 dvfsrc->dram_type);
+			dvfsrc->dram_type = 0;
+			dvfsrc->dvfsrc_enable = false;
+		}
 	}
 
 #ifdef DVFSRC_OPP_BW_QUERY
@@ -1712,20 +1923,6 @@ static int mtk_dvfsrc_probe(struct platform_device *pdev)
 		dvfsrc->irq_counter = 0;
 		dvfsrc_write(dvfsrc, DVFSRC_INT_EN, dvfsrc_read(dvfsrc, DVFSRC_INT_EN) | 0x2);
 		dev_info(dvfsrc->dev, "DVFSRC IRQ Enable\n");
-	}
-
-	if (of_device_is_compatible(pdev->dev.of_node, "mediatek,mt6768-dvfsrc")) {
-		/*
-		 * MT6768: Mask MD DVFS requests. SPM DVFS PCM firmware is not running
-		 * in modern kernels, so DVFSRC cannot arbitrate dynamic OPP transitions
-		 * from the modem. Setting MD_SW_CONTROL (0x84) masks MD requests to
-		 * prevent modem timeout at DVFS_drv.c:1923.
-		 */
-		writel(readl(dvfsrc->regs + 0x84) | 0x20000029, dvfsrc->regs + 0x84);
-		writel(0x0, dvfsrc->regs + 0x68);
-		writel(0x0, dvfsrc->regs + 0x80);
-		dev_info(dvfsrc->dev, "MT6768: Masked MD DVFS requests (MD_SW_CONTROL=0x%08x)\n",
-			readl(dvfsrc->regs + 0x84));
 	}
 
 	dvfsrc->regulator = platform_device_register_data(dvfsrc->dev,

@@ -62,14 +62,18 @@ static int mtk_dvfsrc_start_probe(struct platform_device *pdev)
 	struct arm_smccc_res ares;
 	struct mtk_dvfsrc_start *dvfsrc;
 
+	int ret;
+
 	dvfsrc = devm_kzalloc(&pdev->dev, sizeof(*dvfsrc), GFP_KERNEL);
 	if (!dvfsrc)
 		return -ENOMEM;
 
 	dvfsrc->dev = &pdev->dev;
 	dvfsrc_drv = dvfsrc;
-	arm_smccc_smc(MTK_SIP_VCOREFS_CONTROL, MTK_SIP_DVFSRC_START, 0, 0, 0,
-		0, 0, 0, &ares);
+	ret = pdev->dev.parent ? mtk_dvfsrc_legacy_start(pdev->dev.parent) : 0;
+	if (ret == 0)
+		arm_smccc_smc(MTK_SIP_VCOREFS_CONTROL, MTK_SIP_DVFSRC_START,
+			      0, 0, 0, 0, 0, 0, &ares);
 	atomic_notifier_chain_register(&panic_notifier_list, &panic_blk);
 	register_die_notifier(&die_blk);
 

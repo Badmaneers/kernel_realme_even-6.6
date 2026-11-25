@@ -25,6 +25,7 @@
 #if IS_ENABLED(CONFIG_MTK_DVFSRC)
 void mtk_dvfsrc_send_request(const struct device *dev, u32 cmd, u64 data);
 int mtk_dvfsrc_query_info(const struct device *dev, u32 cmd, int *data);
+int mtk_dvfsrc_legacy_start(struct device *dev);
 #else
 static inline void mtk_dvfsrc_send_request(const struct device *dev, u32 cmd,
 					   u64 data)
@@ -32,6 +33,8 @@ static inline void mtk_dvfsrc_send_request(const struct device *dev, u32 cmd,
 static inline int mtk_dvfsrc_query_info(const struct device *dev, u32 cmd,
 					int *data)
 { return -ENODEV; }
+static inline int mtk_dvfsrc_legacy_start(struct device *dev)
+{ return 0; }
 
 #endif /* CONFIG_MTK_DVFSRC */
 
