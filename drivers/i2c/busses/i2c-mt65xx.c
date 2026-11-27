@@ -2376,10 +2376,23 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
 	}
 
 	if (i2c->irq_stat & (I2C_HS_NACKERR | I2C_ACKERR)) {
+		u16 start_reg = mtk_i2c_readw(i2c, OFFSET_START);
+
 		i2c->last_addr = mtk_i2c_readw(i2c, OFFSET_SLAVE_ADDR1);
 		dev_info(i2c->dev, "addr: %x, transfer ACK error\n", msgs->addr);
+		if (i2c->ch_offset_i2c != 0) {
+			mtk_i2c_writew_shadow(i2c, I2C_FSM_RST | I2C_SOFT_RST,
+					      OFFSET_SOFTRESET);
+			udelay(50);
+			intr_stat_reg_chn = mtk_i2c_readw_shadow(i2c, OFFSET_INTR_STAT);
+			if (intr_stat_reg_chn & I2C_CONFERR)
+				mtk_i2c_writew_shadow(i2c, I2C_CONFERR,
+						      OFFSET_INTR_STAT);
+			mtk_i2c_writew(i2c, I2C_FIFO_ADDR_CLR_MCH | I2C_FIFO_ADDR_CLR,
+				       OFFSET_FIFO_ADDR_CLR);
+		}
 		mtk_i2c_init_hw(i2c);
-		if (i2c->ch_offset_i2c) {
+		if ((i2c->ch_offset_i2c) && (start_reg & I2C_RESUME_ARBIT)) {
 			mtk_i2c_writew_shadow(i2c, I2C_RESUME_ARBIT, OFFSET_START);
 			dev_info(i2c->dev, "bus channel transferred\n");
 		}
