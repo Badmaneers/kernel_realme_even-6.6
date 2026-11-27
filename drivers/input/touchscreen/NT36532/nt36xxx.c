@@ -21,6 +21,7 @@
 #include <linux/irq.h>
 #include <linux/gpio.h>
 #include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 #include <linux/input/mt.h>
 #include <linux/of_gpio.h>
 #include <linux/pinctrl/consumer.h>
@@ -106,6 +107,13 @@ extern int32_t nvt_set_charger(uint8_t charger_on_off);
 bool nvt_gesture_flag = false;
 EXPORT_SYMBOL(nvt_gesture_flag);
 /* Spinel code for OSPINEL-192 by dingying3 at 2023/3/6 end */
+#if IS_ENABLED(CONFIG_TOUCHPANEL_NOTIFY) && WAKEUP_GESTURE
+extern int (*tp_gesture_enable_notifier)(unsigned int tp_index);
+static int nvt_tp_gesture_enable_flag(unsigned int tp_index)
+{
+	return nvt_gesture_flag ? 1 : 0;
+}
+#endif
 struct nvt_ts_data *ts;
 
 #if BOOT_UPDATE_FIRMWARE
@@ -160,19 +168,19 @@ const uint16_t touch_key_array[TOUCH_KEY_NUM] = {
 
 #if WAKEUP_GESTURE
 const uint16_t gesture_key_array[] = {
-	KEY_POWER,  //GESTURE_WORD_C
-	KEY_POWER,  //GESTURE_WORD_W
-	KEY_POWER,  //GESTURE_WORD_V
-	KEY_POWER,  //GESTURE_DOUBLE_CLICK
-	KEY_POWER,  //GESTURE_WORD_Z
-	KEY_POWER,  //GESTURE_WORD_M
-	KEY_POWER,  //GESTURE_WORD_O
-	KEY_POWER,  //GESTURE_WORD_e
-	KEY_POWER,  //GESTURE_WORD_S
-	KEY_POWER,  //GESTURE_SLIDE_UP
-	KEY_POWER,  //GESTURE_SLIDE_DOWN
-	KEY_POWER,  //GESTURE_SLIDE_LEFT
-	KEY_POWER,  //GESTURE_SLIDE_RIGHT
+	0,          //GESTURE_WORD_C
+	0,          //GESTURE_WORD_W
+	0,          //GESTURE_WORD_V
+	KEY_WAKEUP, //GESTURE_DOUBLE_CLICK
+	0,          //GESTURE_WORD_Z
+	0,          //GESTURE_WORD_M
+	0,          //GESTURE_WORD_O
+	0,          //GESTURE_WORD_e
+	0,          //GESTURE_WORD_S
+	0,          //GESTURE_SLIDE_UP
+	0,          //GESTURE_SLIDE_DOWN
+	0,          //GESTURE_SLIDE_LEFT
+	0,          //GESTURE_SLIDE_RIGHT
 };
 #endif
 
@@ -235,6 +243,59 @@ static void nvt_irq_enable(bool enable)
 	desc = irq_to_desc(ts->client->irq);
 	NVT_LOG("enable=%d, desc->depth=%d\n", enable, desc->depth);
 }
+
+#if WAKEUP_GESTURE
+static int nvt_cmd_store(uint8_t cmd)
+{
+	uint8_t buf[3] = {0};
+	int i;
+	const int retry = 5;
+
+	if (ts->mmap)
+		nvt_set_page(ts->mmap->EVENT_BUF_ADDR);
+
+	for (i = 0; i < retry; i++) {
+		buf[0] = EVENT_MAP_HOST_CMD;
+		buf[1] = cmd;
+		CTP_SPI_WRITE(ts->client, buf, 2);
+
+		msleep(20);
+
+		buf[0] = EVENT_MAP_HOST_CMD;
+		buf[1] = 0xFF;
+		CTP_SPI_READ(ts->client, buf, 2);
+		if (buf[1] == 0x00) {
+			NVT_LOG("cmd 0x%02X acked (try %d)\n", cmd, i);
+			return 0;
+		}
+	}
+
+	NVT_ERR("cmd 0x%02X failed, buf[1]=0x%02X\n", cmd, buf[1]);
+	return -EIO;
+}
+
+static void nvt_irq_wake_enable(bool enable)
+{
+	int ret;
+
+	if (!ts || !ts->client || ts->client->irq <= 0)
+		return;
+
+	if (enable && !ts->irq_wake_enabled) {
+		ret = enable_irq_wake(ts->client->irq);
+		if (ret < 0)
+			NVT_ERR("enable_irq_wake failed (%d)\n", ret);
+		else
+			ts->irq_wake_enabled = true;
+	} else if (!enable && ts->irq_wake_enabled) {
+		ret = disable_irq_wake(ts->client->irq);
+		if (ret < 0)
+			NVT_ERR("disable_irq_wake failed (%d)\n", ret);
+		else
+			ts->irq_wake_enabled = false;
+	}
+}
+#endif
 
 /*******************************************************
 Description:
@@ -1656,6 +1717,10 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 		nvt_read_fw_history(ts->mmap->MMAP_HISTORY_EVENT0);
 		nvt_read_fw_history(ts->mmap->MMAP_HISTORY_EVENT1);
 		nvt_update_firmware(BOOT_UPDATE_FIRMWARE_NAME);
+#if WAKEUP_GESTURE
+		if (!bTouchIsAwake && READ_ONCE(nvt_gesture_flag))
+			nvt_cmd_store(0x13);
+#endif
 /*Spinel code for OSPINEL-6922 by zhangyd22 at 2023/06/15 start*/
 #if NVT_CUST_PROC_CMD
 		wdt_recovery = true;
@@ -1667,6 +1732,9 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 
 	/* ESD protect by FW handshake */
 	if (nvt_fw_recovery(point_data)) {
+		if (!bTouchIsAwake)
+			NVT_LOG("wake packet dropped by nvt_fw_recovery: %02X %02X %02X\n",
+				point_data[1], point_data[2], point_data[3]);
 #if NVT_TOUCH_ESD_PROTECT
 		nvt_esd_check_enable(true);
 #endif /* #if NVT_TOUCH_ESD_PROTECT */
@@ -1674,12 +1742,12 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 	}
 
 #if POINT_DATA_CHECKSUM
-   if (POINT_DATA_LEN >= POINT_DATA_CHECKSUM_LEN) {
-       ret = nvt_ts_point_data_checksum(point_data, POINT_DATA_CHECKSUM_LEN);
-       if (ret) {
-           goto XFER_ERROR;
-       }
-   }
+	if (bTouchIsAwake && POINT_DATA_LEN >= POINT_DATA_CHECKSUM_LEN) {
+		ret = nvt_ts_point_data_checksum(point_data, POINT_DATA_CHECKSUM_LEN);
+		if (ret) {
+			goto XFER_ERROR;
+		}
+	}
 #endif /* POINT_DATA_CHECKSUM */
 
 /* Spinel code for OSPINEL-2020 by zhangyd22 at 2023/4/4 start */
@@ -1693,6 +1761,8 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 #if WAKEUP_GESTURE
 	if (bTouchIsAwake == 0) {
 		input_id = (uint8_t)(point_data[1] >> 3);
+		NVT_LOG("wake packet: p1=%02X(id=%d) p2=%02X p3=%02X\n",
+			point_data[1], input_id, point_data[2], point_data[3]);
 		nvt_ts_wakeup_gesture_report(input_id, point_data);
 		mutex_unlock(&ts->lock);
 		return IRQ_HANDLED;
@@ -2179,6 +2249,82 @@ out:
 }
 /* Spinel code for OSPINEL-192 by dingying3 at 2023/3/6 start */
 #if WAKEUP_GESTURE
+static struct proc_dir_entry *nvt_touchpanel_dir;
+static struct proc_dir_entry *nvt_double_tap_entry;
+#if !NVT_TOUCH_EXT_PROC
+static struct proc_dir_entry *nvt_gesture_ctrl_entry;
+#endif
+
+static int nvt_double_tap_show(struct seq_file *m, void *v)
+{
+	seq_printf(m, "%d\n", nvt_gesture_flag ? 1 : 0);
+	return 0;
+}
+
+static int nvt_double_tap_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, nvt_double_tap_show, NULL);
+}
+
+static ssize_t nvt_double_tap_write(struct file *file, const char __user *buffer,
+				    size_t count, loff_t *pos)
+{
+	bool enabled = false;
+	int ret;
+
+	if (count == 0)
+		return 0;
+
+	ret = kstrtobool_from_user(buffer, count, &enabled);
+	if (ret)
+		return ret;
+
+	nvt_gesture_flag = enabled;
+	NVT_LOG("double tap gesture %s\n", enabled ? "enabled" : "disabled");
+	return count;
+}
+
+static const struct proc_ops nvt_double_tap_proc_ops = {
+	.proc_open    = nvt_double_tap_open,
+	.proc_read    = seq_read,
+	.proc_write   = nvt_double_tap_write,
+	.proc_lseek   = seq_lseek,
+	.proc_release = single_release,
+};
+
+static void nvt_gesture_proc_init(void)
+{
+	nvt_touchpanel_dir = proc_mkdir("touchpanel", NULL);
+	if (!nvt_touchpanel_dir) {
+		NVT_ERR("failed to create /proc/touchpanel directory\n");
+	} else {
+		nvt_double_tap_entry = proc_create("double_tap_enable", 0666,
+						   nvt_touchpanel_dir,
+						   &nvt_double_tap_proc_ops);
+		if (!nvt_double_tap_entry)
+			NVT_ERR("failed to create /proc/touchpanel/double_tap_enable\n");
+	}
+
+#if !NVT_TOUCH_EXT_PROC
+	nvt_gesture_ctrl_entry = proc_create("gesture_control", 0666, NULL,
+					     &nvt_double_tap_proc_ops);
+	if (!nvt_gesture_ctrl_entry)
+		NVT_ERR("failed to create /proc/gesture_control\n");
+#endif
+}
+
+static void nvt_gesture_proc_deinit(void)
+{
+#if !NVT_TOUCH_EXT_PROC
+	proc_remove(nvt_gesture_ctrl_entry);
+	nvt_gesture_ctrl_entry = NULL;
+#endif
+	proc_remove(nvt_double_tap_entry);
+	nvt_double_tap_entry = NULL;
+	proc_remove(nvt_touchpanel_dir);
+	nvt_touchpanel_dir = NULL;
+}
+
 int nvt_gesture_switch(struct input_dev *dev, unsigned int type, unsigned int code, int value)
 {
 	NVT_LOG("%s:start\n", __func__);
@@ -2460,23 +2606,23 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 	ts->client->bits_per_word = 8;
 	ts->client->mode = SPI_MODE_0;
 
+#ifdef CONFIG_MTK_SPI
+	/* old usage of MTK spi API */
+	memcpy(&ts->spi_ctrl, &spi_ctrdata, sizeof(struct mt_chip_conf));
+	ts->client->controller_data = (void *)&ts->spi_ctrl;
+#endif
+
+#ifdef CONFIG_SPI_MT65XX
+	/* new usage of MTK spi API */
+	memcpy(&ts->spi_ctrl, &spi_ctrdata, sizeof(struct mtk_chip_config));
+	ts->client->controller_data = (void *)&ts->spi_ctrl;
+#endif
+
 	ret = spi_setup(ts->client);
 	if (ret < 0) {
 		NVT_ERR("Failed to perform SPI setup\n");
 		goto err_spi_setup;
 	}
-
-#ifdef CONFIG_MTK_SPI
-    /* old usage of MTK spi API */
-    memcpy(&ts->spi_ctrl, &spi_ctrdata, sizeof(struct mt_chip_conf));
-    ts->client->controller_data = (void *)&ts->spi_ctrl;
-#endif
-
-#ifdef CONFIG_SPI_MT65XX
-    /* new usage of MTK spi API */
-    memcpy(&ts->spi_ctrl, &spi_ctrdata, sizeof(struct mtk_chip_config));
-    ts->client->controller_data = (void *)&ts->spi_ctrl;
-#endif
 
 	NVT_LOG("mode=%d, max_speed_hz=%d\n", ts->client->mode, ts->client->max_speed_hz);
 
@@ -2612,7 +2758,8 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 /* Spinel code for OSPINEL-2020 by zhangyd22 at 2023/4/4 end */
 #if WAKEUP_GESTURE
 	for (retry = 0; retry < (sizeof(gesture_key_array) / sizeof(gesture_key_array[0])); retry++) {
-		input_set_capability(ts->input_dev, EV_KEY, gesture_key_array[retry]);
+		if (gesture_key_array[retry] > 0)
+			input_set_capability(ts->input_dev, EV_KEY, gesture_key_array[retry]);
 	}
 	/* Spinel code for OSPINEL-192 by dingying3 at 2023/3/6 start */
 	ts->input_dev->event = nvt_gesture_switch;
@@ -2763,6 +2910,12 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 		goto err_extra_proc_init_failed;
 	}
 #endif
+#if WAKEUP_GESTURE
+	nvt_gesture_proc_init();
+#if IS_ENABLED(CONFIG_TOUCHPANEL_NOTIFY)
+	tp_gesture_enable_notifier = nvt_tp_gesture_enable_flag;
+#endif
+#endif
 /*
 #if NVT_TOUCH_MP
 	ret = nvt_mp_proc_init();
@@ -2862,6 +3015,13 @@ err_mp_proc_init_failed:
 #if NVT_TOUCH_EXT_PROC
 	nvt_extra_proc_deinit();
 err_extra_proc_init_failed:
+#endif
+#if WAKEUP_GESTURE
+	nvt_gesture_proc_deinit();
+#if IS_ENABLED(CONFIG_TOUCHPANEL_NOTIFY)
+	if (tp_gesture_enable_notifier == nvt_tp_gesture_enable_flag)
+		tp_gesture_enable_notifier = NULL;
+#endif
 #endif
 #if NVT_TOUCH_PROC
 	nvt_flash_proc_deinit();
@@ -3011,6 +3171,12 @@ static void nvt_ts_remove(struct spi_device *client)
 #endif
 
 #if WAKEUP_GESTURE
+	nvt_gesture_proc_deinit();
+#if IS_ENABLED(CONFIG_TOUCHPANEL_NOTIFY)
+	if (tp_gesture_enable_notifier == nvt_tp_gesture_enable_flag)
+		tp_gesture_enable_notifier = NULL;
+#endif
+	nvt_irq_wake_enable(false);
 	device_init_wakeup(&ts->input_dev->dev, 0);
 #endif
 
@@ -3098,6 +3264,12 @@ static void nvt_ts_shutdown(struct spi_device *client)
 #endif
 
 #if WAKEUP_GESTURE
+#if IS_ENABLED(CONFIG_TOUCHPANEL_NOTIFY)
+	if (tp_gesture_enable_notifier == nvt_tp_gesture_enable_flag)
+		tp_gesture_enable_notifier = NULL;
+#endif
+	nvt_gesture_proc_deinit();
+	nvt_irq_wake_enable(false);
 	device_init_wakeup(&ts->input_dev->dev, 0);
 #endif
 }
@@ -3111,35 +3283,38 @@ return:
 *******************************************************/
 static int32_t nvt_ts_suspend(struct device *dev)
 {
+#if !WAKEUP_GESTURE
 	uint8_t buf[4] = {0};
+#endif
 #if MT_PROTOCOL_B
 	uint32_t i = 0;
 #endif
 	int ret = 0;
+	bool keep_gesture_wake = false;
+
 	if (!bTouchIsAwake) {
 		NVT_LOG("Touch is already suspend\n");
 		return 0;
 	}
 
-	if (nt36672_pinctrl && nt36672_spi_mode_lowpower) {
-		ret = pinctrl_select_state(nt36672_pinctrl, nt36672_spi_mode_lowpower);
-		if (ret < 0)
-			NVT_ERR("Failed to select lowpower pinstate, r:%d", ret);
-	}
-
-	if (nt36672_touch_pinctrl && nt36672_touch_mode_lowpower) {
-		ret = pinctrl_select_state(nt36672_touch_pinctrl, nt36672_touch_mode_lowpower);
-		if (ret < 0)
-			NVT_ERR("Failed to select touch lowpower pinstate, r:%d", ret);
-	}
-
-/* Spinel code for OSPINEL-192 by dingying3 at 2023/3/6 start */
 #if WAKEUP_GESTURE
-	if (nvt_gesture_flag == false)
-		nvt_irq_enable(false);
-#else
-	nvt_irq_enable(false);
+	keep_gesture_wake = READ_ONCE(nvt_gesture_flag);
 #endif
+	if (!keep_gesture_wake) {
+		if (nt36672_pinctrl && nt36672_spi_mode_lowpower) {
+			ret = pinctrl_select_state(nt36672_pinctrl, nt36672_spi_mode_lowpower);
+			if (ret < 0)
+				NVT_ERR("Failed to select lowpower pinstate, r:%d", ret);
+		}
+
+		if (nt36672_touch_pinctrl && nt36672_touch_mode_lowpower) {
+			ret = pinctrl_select_state(nt36672_touch_pinctrl, nt36672_touch_mode_lowpower);
+			if (ret < 0)
+				NVT_ERR("Failed to select touch lowpower pinstate, r:%d", ret);
+		}
+
+		nvt_irq_enable(false);
+	}
 /* Spinel code for OSPINEL-192 by dingying3 at 2023/3/6 end */
 
 #if NVT_TOUCH_ESD_PROTECT
@@ -3156,31 +3331,17 @@ static int32_t nvt_ts_suspend(struct device *dev)
 
 #if WAKEUP_GESTURE
 	//---write command to enter "wakeup gesture mode"---
-	/* Spinel code for OSPINEL-192 by dingying3 at 2023/3/6 start */
-	/* Spinel code for OSPINEL-6824 by gaobw1 at 2023/6/8 start */
-	if ((nvt_gesture_flag == true) && !(hall_work_status == 0)) {
-	/* Spinel code for OSPINEL-6824 by gaobw1 at 2023/6/8 end */
-		buf[0] = EVENT_MAP_HOST_CMD;
-		buf[1] = 0x13;
-		CTP_SPI_WRITE(ts->client, buf, 2);
-		enable_irq_wake(ts->client->irq);
+	if (keep_gesture_wake) {
+		nvt_cmd_store(0x13);
+		nvt_irq_wake_enable(true);
 		NVT_LOG("Enabled touch wakeup gesture\n");
-/* Spinel code for OSPINEL-486 by zhangyd22 at 2023/7/10 start */
-		nvt_hall_pm = 0;
-		nvt_hall_pm_status = 0;
-/* Spinel code for OSPINEL-486 by zhangyd22 at 2023/7/10 end */
-/* Spinel code for OSPINEL-3680 by zhangyd22 at 2023/5/11 start */
 #if NVT_HALL_CHECK
 		queue_delayed_work(nvt_hall_check_wq, &nvt_hall_check_work,
 			msecs_to_jiffies(NVT_HALL_WORK_DELAY));
 #endif
-/* Spinel code for OSPINEL-3680 by zhangyd22 at 2023/5/11 end */
 	} else {
-		buf[0] = EVENT_MAP_HOST_CMD;
-		buf[1] = 0x11;
-		CTP_SPI_WRITE(ts->client, buf, 2);
+		nvt_cmd_store(0x11);
 	}
-	/* Spinel code for OSPINEL-192 by dingying3 at 2023/3/6 end */
 
 #else // WAKEUP_GESTURE
 	//---write command to enter "deep sleep mode"---
@@ -3274,9 +3435,10 @@ static int32_t nvt_ts_resume(struct device *dev)
 		nvt_check_fw_reset_state(RESET_STATE_REK);
 	}
 
-//#if !WAKEUP_GESTURE
+#if WAKEUP_GESTURE
+	nvt_irq_wake_enable(false);
+#endif
 	nvt_irq_enable(true);
-//#endif
 
 #if NVT_TOUCH_ESD_PROTECT
 	nvt_esd_check_enable(false);
@@ -3358,6 +3520,13 @@ static int nvt_disp_notifier_callback(struct notifier_block *nb, unsigned long e
 			if (*data == MTK_DISP_BLANK_POWERDOWN) {
 				nvt_ts_suspend(&ts->client->dev);
 			}
+#if WAKEUP_GESTURE
+			else if (*data == MTK_DISP_BLANK_UNBLANK && !bTouchIsAwake) {
+				/* Mask touch IRQ before panel_prepare toggles RESX */
+				nvt_irq_wake_enable(false);
+				nvt_irq_enable(false);
+			}
+#endif
 			pr_info("%s OUT", __func__);
 		}
 	} else {
@@ -3449,8 +3618,8 @@ static int nvt_ts_pm_suspend(struct device *dev)
 {
 	pr_info("%s:++\n", __func__);
 
-	ts->dev_pm_suspend = true;
 	reinit_completion(&ts->dev_pm_resume_completion);
+	ts->dev_pm_suspend = true;
 
 	pr_info("%s:--\n", __func__);
 	return 0;
@@ -3461,7 +3630,7 @@ static int nvt_ts_pm_resume(struct device *dev)
 	pr_info("%s:++\n", __func__);
 
 	ts->dev_pm_suspend = false;
-	complete(&ts->dev_pm_resume_completion);
+	complete_all(&ts->dev_pm_resume_completion);
 
 	pr_info("%s:--\n", __func__);
 	return 0;

@@ -1638,7 +1638,7 @@ int32_t nvt_extra_proc_init(void)
 		NVT_LOG("create proc/%s Succeeded!\n", NVT_DIFF);
 	}
 	/* Spinel code for OSPINEL-192 by dingying3 at 2023/3/6 start */
-	NVT_gesture_entry = proc_create(GESTURE_CONTROL, 0444, NULL, &gesture_control_fops);
+	NVT_gesture_entry = proc_create(GESTURE_CONTROL, 0666, NULL, &gesture_control_fops);
 	if (NVT_gesture_entry == NULL) {
 		NVT_ERR("create proc/%s Failed!\n", GESTURE_CONTROL);
 		return -ENOMEM;

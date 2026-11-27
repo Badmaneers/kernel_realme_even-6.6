@@ -116,7 +116,7 @@ extern const uint16_t touch_key_array[TOUCH_KEY_NUM];
 #define NVT_EDGE_GRID_ZONE 0
 #define NVT_PALM_MODE 0
 #define NVT_SUPPORT_PEN 0
-#define WAKEUP_GESTURE 0
+#define WAKEUP_GESTURE 1
 #define NVT_DPR_SWITCH 0
 /*Spinel code for charging by wangxin77 at 2023/03/06 start*/
 #define USB_DETECT_IN 1
@@ -214,6 +214,7 @@ struct nvt_ts_data {
 	uint8_t *xbuf;
 	struct mutex xbuf_lock;
 	bool irq_enabled;
+	bool irq_wake_enabled;
 	bool pen_support;
 	bool stylus_resol_double;
 	uint8_t x_gang_num;
