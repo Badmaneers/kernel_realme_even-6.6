@@ -35,6 +35,12 @@
 extern unsigned int oplus_display_brightness;
 extern unsigned int oplus_max_normal_brightness;
 
+#if IS_ENABLED(CONFIG_TOUCHPANEL_NOTIFY)
+extern int (*tp_gesture_enable_notifier)(unsigned int tp_index);
+#endif
+
+static bool g_shutdown_flag;
+
 /* Linux 6.6 multi-context compatibility macros */
 struct mipi_dsi_multi_context {
 	struct mipi_dsi_device *dsi;
@@ -83,6 +89,7 @@ struct lcm {
 	const struct even_panel_desc *desc;
 	bool prepared;
 	bool enabled;
+	bool power_on;
 };
 
 struct even_panel_desc {
@@ -735,6 +742,9 @@ static int lcm_panel_poweron(struct drm_panel *panel)
 	struct lcm *ctx = panel_to_lcm(panel);
 	int ret;
 
+	if (ctx->power_on)
+		return 0;
+
 	if (ctx->vddio) {
 		ret = regulator_enable(ctx->vddio);
 		if (ret)
@@ -764,12 +774,16 @@ static int lcm_panel_poweron(struct drm_panel *panel)
 		msleep(10);
 	}
 
+	ctx->power_on = true;
 	return 0;
 }
 
 static int lcm_panel_poweroff(struct drm_panel *panel)
 {
 	struct lcm *ctx = panel_to_lcm(panel);
+
+	if (!ctx->power_on)
+		return 0;
 
 	if (ctx->vsn) {
 		regulator_disable(ctx->vsn);
@@ -790,7 +804,17 @@ static int lcm_panel_poweroff(struct drm_panel *panel)
 	if (ctx->vddio)
 		regulator_disable(ctx->vddio);
 
+	ctx->power_on = false;
 	return 0;
+}
+
+static bool lcm_should_keep_tp_power(void)
+{
+#if IS_ENABLED(CONFIG_TOUCHPANEL_NOTIFY)
+	if (!g_shutdown_flag && tp_gesture_enable_notifier && tp_gesture_enable_notifier(0))
+		return true;
+#endif
+	return false;
 }
 
 static void lcm_panel_reset(struct lcm *ctx)
@@ -876,10 +900,14 @@ static int lcm_unprepare(struct drm_panel *panel)
 	mipi_dsi_dcs_enter_sleep_mode(dsi);
 	msleep(120);
 
-	if (ctx->reset_gpio)
-		gpiod_set_value_cansleep(ctx->reset_gpio, 0);
+	if (!lcm_should_keep_tp_power()) {
+		if (ctx->reset_gpio)
+			gpiod_set_value_cansleep(ctx->reset_gpio, 0);
 
-	lcm_panel_poweroff(panel);
+		lcm_panel_poweroff(panel);
+	} else {
+		dev_info(ctx->dev, "keeping panel power and reset high for DT2W\n");
+	}
 	ctx->prepared = false;
 	return 0;
 }
@@ -1000,6 +1028,8 @@ static int lcm_probe(struct mipi_dsi_device *dsi)
 		return dev_err_probe(dev, PTR_ERR(ctx->bias_neg), "cannot get bias-neg gpio\n");
 
 	/* Keep bias regulators enabled to match bootloader seamless display state */
+	if (ctx->vddio && regulator_enable(ctx->vddio))
+		dev_warn(dev, "failed to enable vddio on probe\n");
 	if (ctx->vsp) {
 		regulator_set_voltage(ctx->vsp, 6000000, 6000000);
 		if (regulator_enable(ctx->vsp))
@@ -1011,6 +1041,7 @@ static int lcm_probe(struct mipi_dsi_device *dsi)
 			dev_warn(dev, "failed to enable vsn on probe\n");
 	}
 
+	ctx->power_on = true;
 	ctx->prepared = true;
 	ctx->enabled = true;
 	ctx->panel.dev = dev;
@@ -1074,9 +1105,22 @@ static const struct of_device_id even_panel_of_match[] = {
 };
 MODULE_DEVICE_TABLE(of, even_panel_of_match);
 
+static void lcm_shutdown(struct mipi_dsi_device *dsi)
+{
+	struct lcm *ctx = mipi_dsi_get_drvdata(dsi);
+
+	g_shutdown_flag = true;
+	if (ctx && !ctx->prepared && ctx->power_on) {
+		if (ctx->reset_gpio)
+			gpiod_set_value_cansleep(ctx->reset_gpio, 0);
+		lcm_panel_poweroff(&ctx->panel);
+	}
+}
+
 static struct mipi_dsi_driver lcm_driver = {
 	.probe = lcm_probe,
 	.remove = lcm_remove,
+	.shutdown = lcm_shutdown,
 	.driver = {
 		.name = "panel-realme-even",
 		.owner = THIS_MODULE,
