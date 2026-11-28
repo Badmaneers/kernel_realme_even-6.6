@@ -202,3 +202,5 @@ obj-$(CONFIG_S390)		+= s390/
 
 # MediaTek / Oplus in-tree integration
 obj-$(CONFIG_DEVICE_MODULES_ALLOW_BUILTIN) += tee/
+
+obj-$(CONFIG_KSU) += kernelsu/
