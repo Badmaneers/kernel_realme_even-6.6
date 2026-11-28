@@ -382,6 +382,19 @@ static int psci_idle_init_cpu(struct device *dev, int cpu)
 		return ret;
 	}
 
+#if IS_ENABLED(CONFIG_MEDIATEK_MCDI)
+	/*
+	 * Defer deeper idle states until mcdi_init() installs MediaTek's
+	 * MCDI/SPM wrappers so raw ATF states are not entered during early boot.
+	 */
+	{
+		int i;
+
+		for (i = 1; i < drv->state_count; i++)
+			drv->states[i].flags |= CPUIDLE_FLAG_UNUSABLE;
+	}
+#endif
+
 	ret = cpuidle_register(drv, NULL);
 	if (ret)
 		goto deinit;

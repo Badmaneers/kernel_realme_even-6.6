@@ -283,47 +283,76 @@ struct cpuidle_driver *mcdi_state_tbl_get(int cpu)
 static long mcdi_do_work(void *pData)
 {
 	int cpu;
-	int idx;
 	struct cpuidle_driver *drv;
+	struct cpuidle_driver *tbl;
+	struct cpuidle_device *dev;
 	int rcu_flags;
 
 	cpu = smp_processor_id();
-	cpumask_clear(cpu_set_0_mask);
-	cpumask_clear(cpu_set_1_mask);
-	cpu_set_0_mask->bits[0] = default_set_0_mask;
-	cpu_set_1_mask->bits[0] = default_set_1_mask;
 	drv = cpuidle_get_driver();
 	if (!drv) {
 		pr_info("%s, cpuidle_idle_drv = NULL\n", __func__);
 		return 0;
 	}
-	drv->cpumask = cpu_set_1_mask;
-	drv->states[0].exit_latency = mtk_acao_mcdi_state[0].states[0].exit_latency;
-	drv->states[0].exit_latency_ns =
-			mtk_acao_mcdi_state[0].states[0].exit_latency * NSEC_PER_USEC;
-	rcu_flags =  drv->states[0].flags;
-	pr_info("%s,register idle for cpu %d flags0 = %d\n", __func__, cpu, rcu_flags);
-	for (idx = 1; idx < drv->state_count; ++idx) {
-		rcu_flags =  drv->states[idx].flags;
-		pr_info("%s,register idle for cpu %d flags = %d\n", __func__, cpu, rcu_flags);
-		drv->states[0].enter = mtk_rgidle_enter;
-		drv->states[idx].enter = mtk_mcidle_enter;
-		drv->states[idx].exit_latency = mtk_acao_mcdi_state[0].states[idx].exit_latency;
-		drv->states[idx].exit_latency_ns =
-				mtk_acao_mcdi_state[0].states[idx].exit_latency * NSEC_PER_USEC;
+	tbl = mcdi_state_tbl_get(cpu);
+	dev = per_cpu(cpuidle_devices, cpu);
+	if (tbl->states[0].exit_latency) {
+		drv->states[0].exit_latency = tbl->states[0].exit_latency;
+		drv->states[0].exit_latency_ns =
+			tbl->states[0].exit_latency * NSEC_PER_USEC;
 	}
-		return 0;
+	if (tbl->states[0].target_residency) {
+		drv->states[0].target_residency = tbl->states[0].target_residency;
+		drv->states[0].target_residency_ns =
+			tbl->states[0].target_residency * NSEC_PER_USEC;
+	}
+	drv->states[0].enter = mtk_rgidle_enter;
+	rcu_flags = drv->states[0].flags;
+	pr_info("%s,register idle for cpu %d flags0 = %d\n", __func__, cpu, rcu_flags);
+	if (drv->state_count > 1) {
+		/*
+		 * Only expose state 1 (MCDI) to cpuidle
+		 * 2-state layout; deeper states (2..state_count-1) stay
+		 * disabled so menu never invokes raw ATF PSCI states directly.
+		 */
+		drv->states[1].flags =
+			(drv->states[1].flags & ~CPUIDLE_FLAG_UNUSABLE) |
+			CPUIDLE_FLAG_TIMER_STOP;
+		drv->states[1].enter = mtk_mcidle_enter;
+		if (tbl->states[1].exit_latency) {
+			drv->states[1].exit_latency = tbl->states[1].exit_latency;
+			drv->states[1].exit_latency_ns =
+				tbl->states[1].exit_latency * NSEC_PER_USEC;
+		}
+		if (tbl->states[1].target_residency) {
+			drv->states[1].target_residency =
+				tbl->states[1].target_residency;
+			drv->states[1].target_residency_ns =
+				tbl->states[1].target_residency * NSEC_PER_USEC;
+		}
+		if (dev)
+			dev->states_usage[1].disable &=
+				~CPUIDLE_STATE_DISABLED_BY_DRIVER;
+		rcu_flags = drv->states[1].flags;
+		pr_info("%s,register idle for cpu %d flags = %d\n", __func__, cpu, rcu_flags);
+	}
+	return 0;
 }
 
 int mtk_cpuidle_register_driver(void)
 {
 	int cpu;
 
-    cpuidle_pause_and_lock();
+	cpumask_clear(cpu_set_0_mask);
+	cpumask_clear(cpu_set_1_mask);
+	cpu_set_0_mask->bits[0] = default_set_0_mask;
+	cpu_set_1_mask->bits[0] = default_set_1_mask;
+
+	cpuidle_pause_and_lock();
 	for_each_online_cpu(cpu) {
 		work_on_cpu(cpu, mcdi_do_work, NULL);
 	}
-    cpuidle_resume_and_unlock();
+	cpuidle_resume_and_unlock();
 
 	return 0;
 }
