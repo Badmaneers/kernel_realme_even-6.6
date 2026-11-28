@@ -303,6 +303,8 @@ static int even_pinctrl_set(int pin, int state)
 
 /* flashlight enable  pwm function */
 /* 52M/32/100 = 16KHZ  actually 21KHZ for SGM3785*/
+static bool even_pwm_active;
+
 int even_mt_flashlight_led_set_pwm(int pwm_num,u32 level )
 {
 	struct pwm_spec_config pwm_setting;
@@ -320,6 +322,7 @@ int even_mt_flashlight_led_set_pwm(int pwm_num,u32 level )
 	pwm_setting.PWM_MODE_OLD_REGS.THRESH = level;
 
 	pwm_set_spec_config(&pwm_setting);
+	even_pwm_active = true;
 
 	return 0;
 }
@@ -398,6 +401,10 @@ static int even_disable(void)
 {
 	int state = EVEN_PINCTRL_PIN_STATE_LOW;
 
+	if (even_pwm_active) {
+		even_pwm_active = false;
+		mt_pwm_disable(0, false);
+	}
 	even_pinctrl_set(EVEN_PINCTRL_PIN_FLASH_EN, state);
 	even_pinctrl_set(EVEN_PINCTRL_PIN_PWM_GPIO, state);
 
