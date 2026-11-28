@@ -16,22 +16,32 @@
 #include <linux/of.h>
 #include <linux/of_irq.h>
 #include <linux/of_address.h>
-#include <linux/arm-smccc.h>
-#include <linux/soc/mediatek/mtk_sip_svc.h>
+#include <linux/io.h>
 
 #include "mtk_spm.h"
 #include "mtk_spm_irq.h"
 #include "mtk_spm_internal.h"
 
-#define EDGE_TRIG_IRQ_NUM 3
+#define GICD_CTLR		0x0000
+#define GICD_CTLR_RWP		BIT(31)
+#define GICD_TYPER		0x0004
+#define GICD_ISENABLER		0x0100
+#define GICD_ICENABLER		0x0180
+#define GICD_ISPENDR		0x0200
+#define GICD_ICFGR		0x0c00
+#define GIC_MAX_EN_REGS		16
 
-enum MTK_SPM_CIRQ_SMC_CALL {
-	MTK_SPM_IRQ_SMC_SET_PENDING,
-	MTK_SPM_IRQ_SMC_REG_IRQ,
-	MTK_SPM_IRQ_SMC_SET_WAKEUP_SOURCES,
-	MTK_SPM_IRQ_SMC_BACKUP,
-	MTK_SPM_IRQ_SMC_RESTORE
-};
+#define CIRQ_STA_BASE		0x000
+#define CIRQ_ACK_BASE		0x040
+#define CIRQ_MASK_SET_BASE	0x0c0
+#define CIRQ_MASK_CLR_BASE	0x100
+#define CIRQ_SENS_SET_BASE	0x180
+#define CIRQ_SENS_CLR_BASE	0x1c0
+#define CIRQ_POL_SET_BASE	0x240
+#define CIRQ_POL_CLR_BASE	0x280
+#define CIRQ_CON		0x300
+#define CIRQ_CON_EN		BIT(0)
+#define CIRQ_CON_BITS_MASK	0x7
 
 static inline unsigned int virq_to_hwirq(unsigned int virq)
 {
@@ -49,31 +59,6 @@ char __attribute__((weak)) *spm_vcorefs_dump_dvfs_regs(char *p)
 	return NULL;
 }
 
-void __attribute__((weak)) mt_cirq_clone_gic(void)
-{
-	printk_deferred("[name:spm&][SPM] NO %s !!!\n", __func__);
-}
-
-void __attribute__((weak)) mt_cirq_enable(void)
-{
-	printk_deferred("[name:spm&][SPM] NO %s !!!\n", __func__);
-}
-
-void __attribute__((weak)) mt_cirq_flush(void)
-{
-	printk_deferred("[name:spm&][SPM] NO %s !!!\n", __func__);
-}
-
-void __attribute__((weak)) mt_cirq_disable(void)
-{
-	printk_deferred("[name:spm&][SPM] NO %s !!!\n", __func__);
-}
-
-void __attribute__((weak)) set_wakeup_sources(u32 *list, u32 num_events)
-{
-	printk_deferred("[name:spm&]NO %s !!!\n", __func__);
-}
-
 /***************************************************
  * spm edge trigger irq backup/restore
  ***************************************************/
@@ -83,14 +68,188 @@ void __attribute__((weak)) set_wakeup_sources(u32 *list, u32 num_events)
 
 #define IRQ_NUMBER (sizeof(list)/sizeof(struct edge_trigger_irq_list))
 static u32 edge_trig_irqs[IRQ_NUMBER];
+static u32 edge_trig_hwirqs[IRQ_NUMBER];
+
+static void __iomem *gicd_base;
+static void __iomem *sysirq_base;
+static void __iomem *cirq_base;
+static u32 gicd_en_regs;
+static u32 gicd_saved_isenabler[GIC_MAX_EN_REGS];
+static u32 cirq_irq_num = 232;
+static u32 cirq_spi_start = 64;
+static u32 cirq_ctrl_regs = 8;
+
+static void gicd_wait_for_rwp(void)
+{
+	int count = 1000000;
+
+	if (!gicd_base)
+		return;
+
+	while (readl_relaxed(gicd_base + GICD_CTLR) & GICD_CTLR_RWP) {
+		if (!--count) {
+			printk_deferred("[name:spm&][SPM] GICD RWP timeout\n");
+			break;
+		}
+		cpu_relax();
+	}
+}
+
+static void mtk_gic_unmask_hwirq(u32 hwirq)
+{
+	if (!gicd_base || hwirq < 32 || (hwirq / 32) >= gicd_en_regs)
+		return;
+
+	writel_relaxed(BIT(hwirq % 32),
+		       gicd_base + GICD_ISENABLER + (hwirq / 32) * 4);
+}
+
+static void mtk_gic_set_pending_hwirq(u32 hwirq)
+{
+	if (!gicd_base || hwirq < 32 || (hwirq / 32) >= gicd_en_regs)
+		return;
+
+	writel_relaxed(BIT(hwirq % 32),
+		       gicd_base + GICD_ISPENDR + (hwirq / 32) * 4);
+}
+
+static void mtk_gic_mask_all(void)
+{
+	u32 i;
+
+	if (!gicd_base)
+		return;
+
+	for (i = 1; i < gicd_en_regs; i++) {
+		gicd_saved_isenabler[i] =
+			readl_relaxed(gicd_base + GICD_ISENABLER + i * 4);
+		writel_relaxed(0xffffffffU, gicd_base + GICD_ICENABLER + i * 4);
+	}
+	gicd_wait_for_rwp();
+}
+
+static void mtk_gic_mask_restore(void)
+{
+	u32 i;
+
+	if (!gicd_base)
+		return;
+
+	for (i = 1; i < gicd_en_regs; i++) {
+		writel_relaxed(0xffffffffU, gicd_base + GICD_ICENABLER + i * 4);
+		writel_relaxed(gicd_saved_isenabler[i],
+			       gicd_base + GICD_ISENABLER + i * 4);
+	}
+	gicd_wait_for_rwp();
+}
+
+static void mtk_cirq_ack_all(void)
+{
+	u32 i;
+
+	if (!cirq_base)
+		return;
+
+	for (i = 0; i < cirq_ctrl_regs; i++)
+		writel_relaxed(0xffffffffU, cirq_base + CIRQ_ACK_BASE + i * 4);
+	mb();
+}
+
+static void mtk_cirq_mask_all(void)
+{
+	u32 i;
+
+	if (!cirq_base)
+		return;
+
+	for (i = 0; i < cirq_ctrl_regs; i++)
+		writel_relaxed(0xffffffffU,
+			       cirq_base + CIRQ_MASK_SET_BASE + i * 4);
+	mb();
+}
+
+static void mtk_cirq_clone_and_enable(void)
+{
+	int i;
+	u32 st;
+
+	if (!cirq_base || !gicd_base)
+		return;
+
+	for (i = 0; i < IRQ_NUMBER; i++) {
+		u32 hwirq = edge_trig_hwirqs[i];
+		u32 spi_base = 32 + cirq_spi_start;
+		u32 cirq_id, reg_off, bit, cfg, pol;
+
+		if (hwirq < spi_base || hwirq >= spi_base + cirq_irq_num)
+			continue;
+
+		cirq_id = hwirq - spi_base;
+		reg_off = (cirq_id / 32) * 4;
+		bit = BIT(cirq_id % 32);
+
+		cfg = readl_relaxed(gicd_base + GICD_ICFGR + (hwirq / 16) * 4);
+		if (cfg & (0x2U << ((hwirq % 16) * 2)))
+			writel_relaxed(bit, cirq_base + CIRQ_SENS_CLR_BASE + reg_off);
+		else
+			writel_relaxed(bit, cirq_base + CIRQ_SENS_SET_BASE + reg_off);
+
+		if (sysirq_base) {
+			pol = readl_relaxed(sysirq_base + ((hwirq - 32) / 32) * 4);
+			if (pol & BIT((hwirq - 32) % 32))
+				writel_relaxed(bit, cirq_base + CIRQ_POL_CLR_BASE + reg_off);
+			else
+				writel_relaxed(bit, cirq_base + CIRQ_POL_SET_BASE + reg_off);
+		}
+
+		if (gicd_saved_isenabler[hwirq / 32] & BIT(hwirq % 32))
+			writel_relaxed(bit, cirq_base + CIRQ_MASK_CLR_BASE + reg_off);
+		else
+			writel_relaxed(bit, cirq_base + CIRQ_MASK_SET_BASE + reg_off);
+	}
+
+	mtk_cirq_ack_all();
+	st = readl_relaxed(cirq_base + CIRQ_CON);
+	st |= CIRQ_CON_EN;
+	writel_relaxed(st & CIRQ_CON_BITS_MASK, cirq_base + CIRQ_CON);
+	mb();
+}
+
+static void mtk_cirq_flush_and_disable(void)
+{
+	int i;
+	u32 st;
+
+	if (!cirq_base)
+		return;
+
+	for (i = 0; i < IRQ_NUMBER; i++) {
+		u32 hwirq = edge_trig_hwirqs[i];
+		u32 spi_base = 32 + cirq_spi_start;
+		u32 cirq_id, reg_off, sta;
+
+		if (hwirq < spi_base || hwirq >= spi_base + cirq_irq_num)
+			continue;
+
+		cirq_id = hwirq - spi_base;
+		reg_off = (cirq_id / 32) * 4;
+		sta = readl_relaxed(cirq_base + CIRQ_STA_BASE + reg_off);
+		if (sta & BIT(cirq_id % 32))
+			mtk_gic_set_pending_hwirq(hwirq);
+	}
+
+	st = readl_relaxed(cirq_base + CIRQ_CON);
+	st &= ~CIRQ_CON_EN;
+	writel_relaxed(st & CIRQ_CON_BITS_MASK, cirq_base + CIRQ_CON);
+	mtk_cirq_mask_all();
+	mtk_cirq_ack_all();
+}
 
 static void mtk_spm_get_edge_trigger_irq(void)
 {
 	int i;
 	struct device_node *node;
 	unsigned int irq_type;
-	struct arm_smccc_res smc_res;
-	unsigned int hwirq = 0;
 
 	pr_info("[SPM] edge trigger irqs:\n");
 	for (i = 0; i < IRQ_NUMBER; i++) {
@@ -103,6 +262,7 @@ static void mtk_spm_get_edge_trigger_irq(void)
 
 		edge_trig_irqs[i] =
 			irq_of_parse_and_map(node, list[i].order);
+		of_node_put(node);
 
 		if (!edge_trig_irqs[i]) {
 			pr_info("[SPM] get '%s' failed\n",
@@ -113,16 +273,11 @@ static void mtk_spm_get_edge_trigger_irq(void)
 		/* Note: Initialize irq type to avoid pending irqs */
 		irq_type = irq_get_trigger_type(edge_trig_irqs[i]);
 		irq_set_irq_type(edge_trig_irqs[i], irq_type);
-		hwirq = virq_to_hwirq(edge_trig_irqs[i]);
-		arm_smccc_smc(MTK_SIP_MTK_LPM_CONTROL,
-					MTK_SPM_IRQ_SMC_REG_IRQ,
-					hwirq, i, 0, 0, 0, 0, &smc_res);
-		if (smc_res.a0)
-			pr_info("[SPM] fail to register wakeup source %d:,ret=0x%lx\n",
-				i, smc_res.a0);
+		edge_trig_hwirqs[i] = virq_to_hwirq(edge_trig_irqs[i]);
 
-		pr_info("[SPM] '%s', irq=%d, type=%d\n", list[i].name,
-			edge_trig_irqs[i], irq_type);
+		pr_info("[SPM] '%s', irq=%d, hwirq=%u, type=%d\n",
+			list[i].name, edge_trig_irqs[i],
+			edge_trig_hwirqs[i], irq_type);
 	}
 }
 
@@ -130,24 +285,17 @@ static bool spm_in_idle;
 static int cpu_pm_callback_wakeup_src_restore(
 	struct notifier_block *self, unsigned long cmd, void *v)
 {
-	struct arm_smccc_res smc_res;
 	int i;
 
 	/* Note: cmd will be CPU_PM_ENTER/CPU_PM_EXIT/CPU_PM_ENTER_FAILED.
 	 * Set edge trigger interrupt pending only in case CPU_PM_EXIT
 	 */
 	if (cmd == CPU_PM_EXIT && spm_in_idle) {
-		for (i = 0; i < EDGE_TRIG_IRQ_NUM; i++) {
-			if (spm_read(SPM_SW_RSV_0) & list[i].wakesrc) {
-				arm_smccc_smc(MTK_SIP_MTK_LPM_CONTROL,
-					MTK_SPM_IRQ_SMC_SET_PENDING,
-					0, 0, 0, 0, 0, 0, &smc_res);
-				if (smc_res.a0)
-					pr_info("[SPM] fail to set edge irq pending: 0x%lx\n",
-						smc_res.a0);
-			}
+		for (i = 0; i < IRQ_NUMBER; i++) {
+			if (edge_trig_hwirqs[i] &&
+			    (spm_read(SPM_SW_RSV_0) & list[i].wakesrc))
+				mtk_gic_set_pending_hwirq(edge_trig_hwirqs[i]);
 		}
-
 	}
 
 	return NOTIFY_OK;
@@ -158,26 +306,25 @@ static struct notifier_block mtk_spm_cpu_pm_notifier_block = {
 };
 
 static unsigned int spm_irq_0;
+static unsigned int spm_hwirq_0;
 
 void mtk_spm_irq_backup(void)
 {
-	struct arm_smccc_res smc_res;
+	int i;
 
 	spm_in_idle = true;
-	arm_smccc_smc(MTK_SIP_MTK_LPM_CONTROL, MTK_SPM_IRQ_SMC_BACKUP,
-		0, 0, 0, 0, 0, 0, &smc_res);
-	if (smc_res.a0)
-		pr_info("[SPM] fail to backup irqs, ret=0x%lx\n", smc_res.a0);
+	mtk_gic_mask_all();
+	mtk_gic_unmask_hwirq(spm_hwirq_0);
+	for (i = 0; i < IRQ_NUMBER; i++)
+		mtk_gic_unmask_hwirq(edge_trig_hwirqs[i]);
+	gicd_wait_for_rwp();
+	mtk_cirq_clone_and_enable();
 }
 
 void mtk_spm_irq_restore(void)
 {
-	struct arm_smccc_res smc_res;
-
-	arm_smccc_smc(MTK_SIP_MTK_LPM_CONTROL, MTK_SPM_IRQ_SMC_RESTORE,
-		0, 0, 0, 0, 0, 0, &smc_res);
-	if (smc_res.a0)
-		pr_info("[SPM] fail to restore cirq, ret=0x%lx\n", smc_res.a0);
+	mtk_cirq_flush_and_disable();
+	mtk_gic_mask_restore();
 	spm_in_idle = false;
 }
 
@@ -251,9 +398,8 @@ struct spm_irq_desc {
 
 int mtk_spm_irq_register(unsigned int spmirq0)
 {
-	struct arm_smccc_res smc_res;
+	struct device_node *node;
 	int i, err, r = 0;
-	unsigned int hwirq0 = 0;
 
 	struct spm_irq_desc irqdesc[] = {
 		{.irq = 0, .handler = spm_irq0_handler,}
@@ -276,14 +422,42 @@ int mtk_spm_irq_register(unsigned int spmirq0)
 
 	/* Assing local spm_irq_0 */
 	spm_irq_0 = spmirq0;
+	spm_hwirq_0 = virq_to_hwirq(spm_irq_0);
+
+	node = of_find_compatible_node(NULL, NULL, "arm,gic-v3");
+	if (node) {
+		gicd_base = of_iomap(node, 0);
+		of_node_put(node);
+		if (gicd_base) {
+			u32 typer = readl_relaxed(gicd_base + GICD_TYPER);
+
+			gicd_en_regs = min_t(u32, (typer & 0x1f) + 1,
+					     GIC_MAX_EN_REGS);
+		}
+	}
+
+	node = of_find_compatible_node(NULL, NULL, "mediatek,mt6577-sysirq");
+	if (node) {
+		sysirq_base = of_iomap(node, 0);
+		of_node_put(node);
+	}
+
+	node = of_find_compatible_node(NULL, NULL, "mediatek,sys_cirq");
+	if (node) {
+		cirq_base = of_iomap(node, 0);
+		of_property_read_u32(node, "mediatek,cirq_num", &cirq_irq_num);
+		of_property_read_u32(node, "mediatek,spi_start_offset",
+				     &cirq_spi_start);
+		of_node_put(node);
+		cirq_ctrl_regs = min_t(u32, (cirq_irq_num + 31) / 32, 16);
+		mtk_cirq_mask_all();
+	}
 
 	mtk_spm_get_edge_trigger_irq();
-	hwirq0 = virq_to_hwirq(spm_irq_0);
-	//set_wakeup_sources(edge_trig_irqs, IRQ_NUMBER);
-	arm_smccc_smc(MTK_SIP_MTK_LPM_CONTROL, MTK_SPM_IRQ_SMC_SET_WAKEUP_SOURCES,
-		hwirq0, 0, 0, 0, 0, 0, &smc_res);
-	if (smc_res.a0)
-		pr_info("[SPM] fail to set wakeup sources, ret=0x%lx\n", smc_res.a0);
+
+	pr_info("[SPM] irq0=%u(hwirq=%u) gicd_regs=%u cirq=%s\n",
+		spm_irq_0, spm_hwirq_0, gicd_en_regs,
+		cirq_base ? "ok" : "none");
 
 	cpu_pm_register_notifier(&mtk_spm_cpu_pm_notifier_block);
 
