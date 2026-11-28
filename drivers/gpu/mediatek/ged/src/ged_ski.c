@@ -188,10 +188,18 @@ static ssize_t gpu_model_show(struct kobject *kobj,
 #endif
 }
 
+#ifdef CONFIG_MTK_GPU_LEGACY
+extern int get_immediate_gpu_wrap(void);
+#endif
+
 static ssize_t gpu_temp_show(struct kobject *kobj,
 		struct kobj_attribute *attr, char *buf)
 {
+#ifdef CONFIG_MTK_GPU_LEGACY
+	int temperature = get_immediate_gpu_wrap();
+#else
 	int temperature = gpufreq_get_cur_temperature();
+#endif
 
 	return scnprintf(buf, PAGE_SIZE, "%d\n", temperature);
 }
