@@ -1046,15 +1046,18 @@ static const struct mtk_mux top_muxes[] = {
 		disp_pwm_parents, CLK_CFG_4, CLK_CFG_4_SET, CLK_CFG_4_CLR,
 		24, 2, 31, CLK_CFG_UPDATE, 19),
 	/* CLK_CFG_5 */
-	MUX_GATE_CLR_SET_UPD(CLK_TOP_SSPM_SEL, "sspm_sel", sspm_parents, CLK_CFG_5,
-		CLK_CFG_5_SET, CLK_CFG_5_CLR, 0, 2, 7, CLK_CFG_UPDATE, 20),
-	MUX_GATE_CLR_SET_UPD(CLK_TOP_DXCC_SEL, "dxcc_sel", dxcc_parents, CLK_CFG_5,
-		CLK_CFG_5_SET, CLK_CFG_5_CLR, 8, 2, 15, CLK_CFG_UPDATE, 21),
+	MUX_GATE_CLR_SET_UPD_FLAGS(CLK_TOP_SSPM_SEL, "sspm_sel", sspm_parents,
+		CLK_CFG_5, CLK_CFG_5_SET, CLK_CFG_5_CLR, 0, 2, 7,
+		CLK_CFG_UPDATE, 20, CLK_IS_CRITICAL),
+	MUX_GATE_CLR_SET_UPD_FLAGS(CLK_TOP_DXCC_SEL, "dxcc_sel", dxcc_parents,
+		CLK_CFG_5, CLK_CFG_5_SET, CLK_CFG_5_CLR, 8, 2, 15,
+		CLK_CFG_UPDATE, 21, CLK_IS_CRITICAL),
 	MUX_GATE_CLR_SET_UPD(CLK_TOP_USB_TOP_SEL, "usb_top_sel",
 		usb_top_parents, CLK_CFG_5, CLK_CFG_5_SET, CLK_CFG_5_CLR,
 		16, 1, 23, CLK_CFG_UPDATE, 22),
-	MUX_GATE_CLR_SET_UPD(CLK_TOP_SPM_SEL, "spm_sel", spm_parents, CLK_CFG_5,
-		CLK_CFG_5_SET, CLK_CFG_5_CLR, 24, 1, 31, CLK_CFG_UPDATE, 23),
+	MUX_GATE_CLR_SET_UPD_FLAGS(CLK_TOP_SPM_SEL, "spm_sel", spm_parents,
+		CLK_CFG_5, CLK_CFG_5_SET, CLK_CFG_5_CLR, 24, 1, 31,
+		CLK_CFG_UPDATE, 23, CLK_IS_CRITICAL),
 	/* CLK_CFG_6 */
 	MUX_GATE_CLR_SET_UPD(CLK_TOP_I2C_SEL, "i2c_sel", i2c_parents, CLK_CFG_6,
 		CLK_CFG_6_SET, CLK_CFG_6_CLR, 0, 3, 7, CLK_CFG_UPDATE, 24),
@@ -1067,9 +1070,9 @@ static const struct mtk_mux top_muxes[] = {
 		aes_fde_parents, CLK_CFG_6, CLK_CFG_6_SET, CLK_CFG_6_CLR,
 		24, 3, 31, CLK_CFG_UPDATE, 27),
 	/* CLK_CFG_7 */
-	MUX_GATE_CLR_SET_UPD(CLK_TOP_PWRAP_ULPOSC_SEL, "ulposc_sel",
+	MUX_GATE_CLR_SET_UPD_FLAGS(CLK_TOP_PWRAP_ULPOSC_SEL, "ulposc_sel",
 		ulposc_parents, CLK_CFG_7, CLK_CFG_7_SET, CLK_CFG_7_CLR,
-		0, 3, 7, CLK_CFG_UPDATE, 28),
+		0, 3, 7, CLK_CFG_UPDATE, 28, CLK_IS_CRITICAL),
 	MUX_GATE_CLR_SET_UPD(CLK_TOP_CAMTM_SEL, "camtm_sel",
 		camtm_parents, CLK_CFG_7, CLK_CFG_7_SET, CLK_CFG_7_CLR,
 		8, 2, 15, CLK_CFG_UPDATE, 29),
@@ -1430,6 +1433,7 @@ static const struct mtk_gate_regs venc_cg_regs = {
 		.regs = &venc_cg_regs,			\
 		.shift = _shift,			\
 		.ops = &mtk_clk_gate_ops_setclr_inv,	\
+		.flags = CLK_IGNORE_UNUSED,		\
 	}
 
 #define GATE_VENC_DUMMY(_id, _name, _parent, _shift) {	\
@@ -1439,6 +1443,7 @@ static const struct mtk_gate_regs venc_cg_regs = {
 		.regs = &venc_cg_regs,			\
 		.shift = _shift,			\
 		.ops = &mtk_clk_gate_ops_setclr_inv_dummy,	\
+		.flags = CLK_IGNORE_UNUSED,		\
 	}
 
 /* MT6768: change mm_ck to venc_ck */
@@ -1471,6 +1476,7 @@ static const struct mtk_gate_regs vdec2_cg_regs = {
 		.regs = &vdec1_cg_regs,			\
 		.shift = _shift,			\
 		.ops = &mtk_clk_gate_ops_setclr_inv,	\
+		.flags = CLK_IGNORE_UNUSED,		\
 	}
 
 #define GATE_VDEC1_DUMMY(_id, _name, _parent, _shift) {	\
@@ -1480,6 +1486,7 @@ static const struct mtk_gate_regs vdec2_cg_regs = {
 		.regs = &vdec1_cg_regs,			\
 		.shift = _shift,			\
 		.ops = &mtk_clk_gate_ops_setclr_inv_dummy,	\
+		.flags = CLK_IGNORE_UNUSED,		\
 	}
 
 #define GATE_VDEC2(_id, _name, _parent, _shift) {	\
@@ -1489,6 +1496,7 @@ static const struct mtk_gate_regs vdec2_cg_regs = {
 		.regs = &vdec2_cg_regs,			\
 		.shift = _shift,			\
 		.ops = &mtk_clk_gate_ops_setclr_inv,	\
+		.flags = CLK_IGNORE_UNUSED,		\
 	}
 
 #define GATE_VDEC2_DUMMY(_id, _name, _parent, _shift) {	\
@@ -1498,6 +1506,7 @@ static const struct mtk_gate_regs vdec2_cg_regs = {
 		.regs = &vdec2_cg_regs,			\
 		.shift = _shift,			\
 		.ops = &mtk_clk_gate_ops_setclr_inv_dummy,	\
+		.flags = CLK_IGNORE_UNUSED,		\
 	}
 
 static const struct mtk_gate vdec_clks[] = {
@@ -1521,6 +1530,7 @@ static const struct mtk_gate_regs cam_cg_regs = {
 		.regs = &cam_cg_regs,			\
 		.shift = _shift,			\
 		.ops = &mtk_clk_gate_ops_setclr,	\
+		.flags = CLK_IGNORE_UNUSED,		\
 	}
 #define GATE_CAM_DUMMY(_id, _name, _parent, _shift) {		\
 		.id = _id,				\
@@ -1529,6 +1539,7 @@ static const struct mtk_gate_regs cam_cg_regs = {
 		.regs = &cam_cg_regs,			\
 		.shift = _shift,			\
 		.ops = &mtk_clk_gate_ops_setclr_dummy,	\
+		.flags = CLK_IGNORE_UNUSED,		\
 	}
 /* MT6768: change mm_ck to cam_ck */
 static const struct mtk_gate cam_clks[] = {
@@ -1556,6 +1567,7 @@ static const struct mtk_gate_regs img_cg_regs = {
 		.regs = &img_cg_regs,			\
 		.shift = _shift,			\
 		.ops = &mtk_clk_gate_ops_setclr,	\
+		.flags = CLK_IGNORE_UNUSED,		\
 	}
 #define GATE_IMG_DUMMY(_id, _name, _parent, _shift) {		\
 		.id = _id,				\
@@ -1564,6 +1576,7 @@ static const struct mtk_gate_regs img_cg_regs = {
 		.regs = &img_cg_regs,			\
 		.shift = _shift,			\
 		.ops = &mtk_clk_gate_ops_setclr_dummy,	\
+		.flags = CLK_IGNORE_UNUSED,		\
 	}
 static const struct mtk_gate img_clks[] = {
 	GATE_IMG(CLK_IMG_LARB2, "img_larb2", "mm_ck", 0),/*use dummy*/
