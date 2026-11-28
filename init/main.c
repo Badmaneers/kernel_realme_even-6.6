@@ -1183,7 +1183,7 @@ trace_initcall_start_cb(void *data, initcall_t fn)
 {
 	ktime_t *calltime = data;
 
-	printk(KERN_INFO "calling  %pS @ %i\n", fn, task_pid_nr(current));
+	printk(KERN_DEBUG "calling  %pS @ %i\n", fn, task_pid_nr(current));
 	*calltime = ktime_get();
 }
 
@@ -1193,7 +1193,7 @@ trace_initcall_finish_cb(void *data, initcall_t fn, int ret)
 	ktime_t rettime, *calltime = data;
 
 	rettime = ktime_get();
-	printk(KERN_INFO "initcall %pS returned %d after %lld usecs\n",
+	printk(KERN_DEBUG "initcall %pS returned %d after %lld usecs\n",
 		 fn, ret, (unsigned long long)ktime_us_delta(rettime, *calltime));
 }
 

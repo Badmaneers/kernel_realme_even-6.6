@@ -74,12 +74,8 @@
 #include <uapi/linux/sched/types.h>
 
 #include <asm/irq_regs.h>
-#include <asm/stacktrace.h>
 #include <asm/switch_to.h>
 #include <asm/tlb.h>
-#include <linux/irqdesc.h>
-#include <linux/kernel_stat.h>
-#include <linux/interrupt.h>
 
 #define CREATE_TRACE_POINTS
 #include <linux/sched/rseq_api.h>
@@ -11819,69 +11815,6 @@ void dump_cpu_task(int cpu)
 
 	pr_info("Task dump for CPU %d:\n", cpu);
 	sched_show_task(cpu_curr(cpu));
-
-	{
-		static bool extra_dumped;
-		if (!extra_dumped) {
-			unsigned long *stk;
-			unsigned int i, shown, irq;
-			struct task_struct *p;
-
-			extra_dumped = true;
-
-#ifdef CONFIG_ARM64
-			stk = per_cpu(irq_stack_ptr, cpu);
-			if (stk) {
-				pr_info("=== CPU %d IRQ stack scan (%p, size=0x%lx) ===\n",
-					cpu, stk, (unsigned long)IRQ_STACK_SIZE);
-				for (i = 0, shown = 0; i < IRQ_STACK_SIZE / sizeof(unsigned long) && shown < 60; i++) {
-					unsigned long val = READ_ONCE_NOCHECK(stk[i]);
-					if (__kernel_text_address(val)) {
-						pr_info("  [IRQ_STK +0x%04lx] %pS (0x%lx)\n",
-							i * sizeof(unsigned long), (void *)val, val);
-						shown++;
-					}
-				}
-			}
-
-			stk = (unsigned long *)task_stack_page(cpu_curr(cpu));
-			if (stk) {
-				pr_info("=== CPU %d TASK stack scan (%p, size=0x%lx) ===\n",
-					cpu, stk, (unsigned long)THREAD_SIZE);
-				for (i = 0, shown = 0; i < THREAD_SIZE / sizeof(unsigned long) && shown < 40; i++) {
-					unsigned long val = READ_ONCE_NOCHECK(stk[i]);
-					if (__kernel_text_address(val)) {
-						pr_info("  [TSK_STK +0x%04lx] %pS (0x%lx)\n",
-							i * sizeof(unsigned long), (void *)val, val);
-						shown++;
-					}
-				}
-			}
-#endif
-			pr_err("=== CPU %d IRQ counts ===\n", cpu);
-			rcu_read_lock();
-			for (irq = 0; irq < nr_irqs; irq++) {
-				unsigned int cnt = kstat_irqs_cpu(irq, cpu);
-				if (cnt) {
-					struct irq_desc *desc = irq_to_desc(irq);
-					const char *name = (desc && desc->action && desc->action->name) ?
-							   desc->action->name : "none";
-					pr_err("  [IRQ %u] cnt=%u name=%s\n", irq, cnt, name);
-				}
-			}
-			p = find_task_by_pid_ns(1, &init_pid_ns);
-			if (p) {
-				pr_err("=== PID 1 (%s) cpu=%d ===\n", p->comm, task_cpu(p));
-				sched_show_task(p);
-			}
-			p = find_task_by_pid_ns(2, &init_pid_ns);
-			if (p) {
-				pr_info("=== PID 2 (%s) cpu=%d ===\n", p->comm, task_cpu(p));
-				sched_show_task(p);
-			}
-			rcu_read_unlock();
-		}
-	}
 }
 
 /*
