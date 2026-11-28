@@ -1170,7 +1170,7 @@ int oplus_battery_get_property(struct power_supply *psy, enum power_supply_prope
 		} else {
 			chip->icharging = oplus_gauge_get_batt_current();
 		}
-		val->intval = chip->icharging;
+		val->intval = chip->icharging * 1000;
 		break;
 	case POWER_SUPPLY_PROP_TEMP:
 		if (oplus_vooc_get_fastchg_started() == true)
@@ -1212,7 +1212,7 @@ int oplus_battery_get_property(struct power_supply *psy, enum power_supply_prope
 		val->intval = chip->batt_rm * 1000;
 		break;
 	case POWER_SUPPLY_PROP_CURRENT_MAX:
-		val->intval = 2000;
+		val->intval = 2000 * 1000;
 		break;
 #endif
 	case POWER_SUPPLY_PROP_CHARGE_FULL:
