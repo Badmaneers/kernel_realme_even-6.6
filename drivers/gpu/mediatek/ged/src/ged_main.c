@@ -33,6 +33,7 @@
 #include "ged_debugFS.h"
 #endif
 #include "ged_sysfs.h"
+#include "ged_ski.h"
 #include "ged_log.h"
 #include "ged_hal.h"
 #include "ged_bridge.h"
@@ -752,6 +753,12 @@ static int ged_pdrv_probe(struct platform_device *pdev)
 		goto ERROR;
 	}
 
+	err = ged_ski_init();
+	if (unlikely(err != GED_OK)) {
+		GED_LOGE("Failed to init ski FS!\n");
+		goto ERROR;
+	}
+
 #ifdef GED_DEBUG_FS
 	err = ged_debugFS_init();
 	if (unlikely(err != GED_OK)) {
@@ -927,6 +934,8 @@ static int ged_pdrv_remove(struct platform_device *pdev)
 #ifdef GED_DEBUG_FS
 	ged_debugFS_exit();
 #endif
+
+	ged_ski_exit();
 
 	ged_sysfs_exit();
 
