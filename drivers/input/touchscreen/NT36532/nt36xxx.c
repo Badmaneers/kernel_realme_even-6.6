@@ -167,20 +167,33 @@ const uint16_t touch_key_array[TOUCH_KEY_NUM] = {
 #endif
 
 #if WAKEUP_GESTURE
+#define NVT_KEY_GESTURE_START   246
+#define NVT_GESTURE_DOUBLETAP   1
+#define NVT_GESTURE_UP_VEE      2
+#define NVT_GESTURE_CIRCLE      6
+#define NVT_GESTURE_L2R_SWIP    8
+#define NVT_GESTURE_R2L_SWIP    9
+#define NVT_GESTURE_U2D_SWIP    10
+#define NVT_GESTURE_D2U_SWIP    11
+#define NVT_GESTURE_M           12
+#define NVT_GESTURE_W           13
+
+static uint32_t nvt_gesture_enable_indep;
+
 const uint16_t gesture_key_array[] = {
-	0,          //GESTURE_WORD_C
-	0,          //GESTURE_WORD_W
-	0,          //GESTURE_WORD_V
-	KEY_WAKEUP, //GESTURE_DOUBLE_CLICK
-	0,          //GESTURE_WORD_Z
-	0,          //GESTURE_WORD_M
-	0,          //GESTURE_WORD_O
-	0,          //GESTURE_WORD_e
-	0,          //GESTURE_WORD_S
-	0,          //GESTURE_SLIDE_UP
-	0,          //GESTURE_SLIDE_DOWN
-	0,          //GESTURE_SLIDE_LEFT
-	0,          //GESTURE_SLIDE_RIGHT
+	0,                                      //GESTURE_WORD_C
+	NVT_KEY_GESTURE_START + NVT_GESTURE_W,  //GESTURE_WORD_W
+	NVT_KEY_GESTURE_START + NVT_GESTURE_UP_VEE, //GESTURE_WORD_V
+	KEY_WAKEUP,                             //GESTURE_DOUBLE_CLICK
+	0,                                      //GESTURE_WORD_Z
+	NVT_KEY_GESTURE_START + NVT_GESTURE_M,  //GESTURE_WORD_M
+	NVT_KEY_GESTURE_START + NVT_GESTURE_CIRCLE, //GESTURE_WORD_O
+	0,                                      //GESTURE_WORD_e
+	0,                                      //GESTURE_WORD_S
+	NVT_KEY_GESTURE_START + NVT_GESTURE_D2U_SWIP, //GESTURE_SLIDE_UP
+	NVT_KEY_GESTURE_START + NVT_GESTURE_U2D_SWIP, //GESTURE_SLIDE_DOWN
+	NVT_KEY_GESTURE_START + NVT_GESTURE_R2L_SWIP, //GESTURE_SLIDE_LEFT
+	NVT_KEY_GESTURE_START + NVT_GESTURE_L2R_SWIP, //GESTURE_SLIDE_RIGHT
 };
 #endif
 
@@ -1181,6 +1194,7 @@ return:
 void nvt_ts_wakeup_gesture_report(uint8_t gesture_id, uint8_t *data)
 {
 	uint32_t keycode = 0;
+	uint8_t gesture_type = 0;
 	uint8_t func_type = data[2];
 	uint8_t func_id = data[3];
 
@@ -1201,14 +1215,17 @@ void nvt_ts_wakeup_gesture_report(uint8_t gesture_id, uint8_t *data)
 			break;
 		case GESTURE_WORD_W:
 			NVT_LOG("Gesture : Word-W.\n");
+			gesture_type = NVT_GESTURE_W;
 			keycode = gesture_key_array[1];
 			break;
 		case GESTURE_WORD_V:
 			NVT_LOG("Gesture : Word-V.\n");
+			gesture_type = NVT_GESTURE_UP_VEE;
 			keycode = gesture_key_array[2];
 			break;
 		case GESTURE_DOUBLE_CLICK:
 			NVT_LOG("Gesture : Double Click.\n");
+			gesture_type = NVT_GESTURE_DOUBLETAP;
 			keycode = gesture_key_array[3];
 			break;
 		case GESTURE_WORD_Z:
@@ -1217,10 +1234,12 @@ void nvt_ts_wakeup_gesture_report(uint8_t gesture_id, uint8_t *data)
 			break;
 		case GESTURE_WORD_M:
 			NVT_LOG("Gesture : Word-M.\n");
+			gesture_type = NVT_GESTURE_M;
 			keycode = gesture_key_array[5];
 			break;
 		case GESTURE_WORD_O:
 			NVT_LOG("Gesture : Word-O.\n");
+			gesture_type = NVT_GESTURE_CIRCLE;
 			keycode = gesture_key_array[6];
 			break;
 		case GESTURE_WORD_e:
@@ -1233,25 +1252,30 @@ void nvt_ts_wakeup_gesture_report(uint8_t gesture_id, uint8_t *data)
 			break;
 		case GESTURE_SLIDE_UP:
 			NVT_LOG("Gesture : Slide UP.\n");
+			gesture_type = NVT_GESTURE_D2U_SWIP;
 			keycode = gesture_key_array[9];
 			break;
 		case GESTURE_SLIDE_DOWN:
 			NVT_LOG("Gesture : Slide DOWN.\n");
+			gesture_type = NVT_GESTURE_U2D_SWIP;
 			keycode = gesture_key_array[10];
 			break;
 		case GESTURE_SLIDE_LEFT:
 			NVT_LOG("Gesture : Slide LEFT.\n");
+			gesture_type = NVT_GESTURE_R2L_SWIP;
 			keycode = gesture_key_array[11];
 			break;
 		case GESTURE_SLIDE_RIGHT:
 			NVT_LOG("Gesture : Slide RIGHT.\n");
+			gesture_type = NVT_GESTURE_L2R_SWIP;
 			keycode = gesture_key_array[12];
 			break;
 		default:
 			break;
 	}
 
-	if (keycode > 0) {
+	if (keycode > 0 && gesture_type > 0 &&
+	    (nvt_gesture_enable_indep & (1U << gesture_type))) {
 		input_report_key(ts->input_dev, keycode, 1);
 		input_sync(ts->input_dev);
 		input_report_key(ts->input_dev, keycode, 0);
@@ -2251,13 +2275,14 @@ out:
 #if WAKEUP_GESTURE
 static struct proc_dir_entry *nvt_touchpanel_dir;
 static struct proc_dir_entry *nvt_double_tap_entry;
+static struct proc_dir_entry *nvt_double_tap_indep_entry;
 #if !NVT_TOUCH_EXT_PROC
 static struct proc_dir_entry *nvt_gesture_ctrl_entry;
 #endif
 
 static int nvt_double_tap_show(struct seq_file *m, void *v)
 {
-	seq_printf(m, "%d\n", nvt_gesture_flag ? 1 : 0);
+	seq_printf(m, "%d\n", !!(nvt_gesture_enable_indep & (1U << NVT_GESTURE_DOUBLETAP)));
 	return 0;
 }
 
@@ -2279,8 +2304,14 @@ static ssize_t nvt_double_tap_write(struct file *file, const char __user *buffer
 	if (ret)
 		return ret;
 
-	nvt_gesture_flag = enabled;
-	NVT_LOG("double tap gesture %s\n", enabled ? "enabled" : "disabled");
+	if (enabled)
+		nvt_gesture_enable_indep |= (1U << NVT_GESTURE_DOUBLETAP);
+	else
+		nvt_gesture_enable_indep &= ~(1U << NVT_GESTURE_DOUBLETAP);
+
+	nvt_gesture_flag = (nvt_gesture_enable_indep != 0);
+	NVT_LOG("double tap gesture %s (indep=0x%x)\n",
+		enabled ? "enabled" : "disabled", nvt_gesture_enable_indep);
 	return count;
 }
 
@@ -2288,6 +2319,46 @@ static const struct proc_ops nvt_double_tap_proc_ops = {
 	.proc_open    = nvt_double_tap_open,
 	.proc_read    = seq_read,
 	.proc_write   = nvt_double_tap_write,
+	.proc_lseek   = seq_lseek,
+	.proc_release = single_release,
+};
+
+static int nvt_double_tap_indep_show(struct seq_file *m, void *v)
+{
+	seq_printf(m, "%x\n", nvt_gesture_enable_indep);
+	return 0;
+}
+
+static int nvt_double_tap_indep_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, nvt_double_tap_indep_show, NULL);
+}
+
+static ssize_t nvt_double_tap_indep_write(struct file *file, const char __user *buffer,
+					  size_t count, loff_t *pos)
+{
+	char buf[16] = {0};
+	int value = 0;
+
+	if (count == 0 || count >= sizeof(buf))
+		return count;
+
+	if (copy_from_user(buf, buffer, count))
+		return -EFAULT;
+
+	if (sscanf(buf, "%d", &value) != 1)
+		return -EINVAL;
+
+	nvt_gesture_enable_indep = (uint32_t)value;
+	nvt_gesture_flag = (nvt_gesture_enable_indep != 0);
+	NVT_LOG("gesture_enable_indep=0x%x\n", nvt_gesture_enable_indep);
+	return count;
+}
+
+static const struct proc_ops nvt_double_tap_indep_proc_ops = {
+	.proc_open    = nvt_double_tap_indep_open,
+	.proc_read    = seq_read,
+	.proc_write   = nvt_double_tap_indep_write,
 	.proc_lseek   = seq_lseek,
 	.proc_release = single_release,
 };
@@ -2303,6 +2374,12 @@ static void nvt_gesture_proc_init(void)
 						   &nvt_double_tap_proc_ops);
 		if (!nvt_double_tap_entry)
 			NVT_ERR("failed to create /proc/touchpanel/double_tap_enable\n");
+
+		nvt_double_tap_indep_entry = proc_create("double_tap_enable_indep", 0666,
+							 nvt_touchpanel_dir,
+							 &nvt_double_tap_indep_proc_ops);
+		if (!nvt_double_tap_indep_entry)
+			NVT_ERR("failed to create /proc/touchpanel/double_tap_enable_indep\n");
 	}
 
 #if !NVT_TOUCH_EXT_PROC
@@ -2319,6 +2396,8 @@ static void nvt_gesture_proc_deinit(void)
 	proc_remove(nvt_gesture_ctrl_entry);
 	nvt_gesture_ctrl_entry = NULL;
 #endif
+	proc_remove(nvt_double_tap_indep_entry);
+	nvt_double_tap_indep_entry = NULL;
 	proc_remove(nvt_double_tap_entry);
 	nvt_double_tap_entry = NULL;
 	proc_remove(nvt_touchpanel_dir);
