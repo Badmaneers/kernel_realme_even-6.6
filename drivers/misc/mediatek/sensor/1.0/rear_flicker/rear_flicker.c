@@ -34,8 +34,6 @@ int rear_flicker_data_report_t(int *value, int status, int64_t time_stamp)
 		event.word[3] = value[3];
 		event.word[4] = value[4];
 		event.word[5] = value[5];
-		event.word[6] = value[6];
-		event.word[7] = value[7];
 		event.status = status;
 		err = sensor_input_event(cxt->rear_flicker_mdev.minor, &event);
 	}
